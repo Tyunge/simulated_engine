@@ -38,7 +38,7 @@ function Transmission:think()
     differential:setInputTorque(self.outputTorque)
     
     //This gets input RPM of the differential and multiplies it by the current ratio
-    self.gearRPM = differential:getGearRPM()*self.ratio
+    self.gearRPM = differential:getGearRPM()*math.abs(self.ratio)
 end
 
 /* Getters */

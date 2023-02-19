@@ -57,7 +57,7 @@ dodir("simulated_engine/objects")
 local wheels = {}
 
 local ratios = {
-    [-1] = 2.923,
+    [-1] = -2.923,
     [0] = 0,
     [1] = 3.250,
     [2] = 1.950,

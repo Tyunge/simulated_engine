@@ -31,8 +31,6 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
         self.snd:setVolume(0)
         
     self.torqueGraph = {0,0.35,0.6,0.8,1,0.9,0.75,0.5} //4 sets of points
-    
-    print(#self.torqueGraph)
 end
 
 function Engine:think()

@@ -43,7 +43,7 @@ function Differential:think()
     wheelRPM = wheelRPM/#self:getLinkedObject()
     
     
-    self.gearRPM = wheelRPM*self.finalRatio
+    self.gearRPM = wheelRPM*math.abs(self.finalRatio)
 
 end
 
