@@ -41,6 +41,15 @@ function Engine:think()
     local transmission = self:getLinkedObject()
     local clutch = transmission:getClutch()
     
+    
+    /*
+        Clutch reaction torque
+    */
+    
+    local strength = 25
+    local reactionTorque = math.rad(self.rpm-self.actualRPM)*self.flyWheelInertia*strength
+    
+    
     //This is real rpm of the engine when connected to the wheels
     self.actualRPM = transmission:getGearRPM()
     
@@ -69,7 +78,7 @@ function Engine:think()
     self.rpm = math.clamp(self.rpm, self.idleRPM, self.redline)
     
     //Send the engine torque to the transmission
-    transmission:setInputTorque(self.outputTorque)
+    transmission:setInputTorque(self.outputTorque+reactionTorque)
 end
 
 
