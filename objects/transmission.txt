@@ -1,0 +1,100 @@
+--@name transmission
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@include simulated_engine/objects/component.txt
+--@server
+dofile("simulated_engine/objects/component.txt")
+
+Transmission = class("Transmission",Component)
+function Transmission:initialize(entity, ratios)
+    if entity == nil then error("Must attach an entity to the transmission!") return end
+    
+    self.entity = entity
+    
+    self.ratios = ratios or 
+        { 
+            [-1] = -4,
+            [0] = 0,
+            [1] = 4,
+            [2] = 3,
+            [3] = 2,
+            [4] = 1
+        }
+    
+    
+    self.clutch = 0
+    self.gear = 0
+    self.ratio = 0
+    self.inputTorque = 0
+    self.outputTorque = 0
+    self.gearRPM = 0
+end
+
+function Transmission:think()
+    local differential = self:getLinkedObject()
+
+    self.ratio = self.ratios[self.gear]
+    self.outputTorque = self.inputTorque*self.ratio*(1-self.clutch)
+    
+    differential:setInputTorque(self.outputTorque)
+    
+    //This gets input RPM of the differential and multiplies it by the current ratio
+    self.gearRPM = differential:getGearRPM()*self.ratio
+end
+
+/* Getters */
+function Transmission:getEntity()
+    return self.entity
+end
+
+function Transmission:getRatios()
+    return self.ratios
+end
+
+function Transmission:getClutch()
+    return self.clutch
+end
+
+function Transmission:getGear()
+    return self.gear
+end
+
+function Transmission:getRatio()
+    return self.ratio
+end
+
+function Transmission:getInputTorque()
+    return self.inputTorque
+end
+
+function Transmission:getOutputTorque()
+    return self.outputTorque
+end
+
+function Transmission:getGearRPM()
+    return self.gearRPM
+end
+
+/* Setters */
+
+function Transmission:setInputTorque(num)
+    self.inputTorque = num
+end
+
+function Transmission:setClutch(num)
+    self.clutch = math.clamp(num,0,1)
+end
+
+function Transmission:gearUp()
+    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
+    self.gear = math.clamp(self.gear+1, minimumRatioIndex, #self.ratios)
+end
+
+function Transmission:gearDown()
+    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
+    self.gear = math.clamp(self.gear-1, minimumRatioIndex, #self.ratios)
+end
+
+function Transmission:setGear(num)
+    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
+    self.gear = math.clamp(num, minimumRatioIndex, #self.ratios)
+end

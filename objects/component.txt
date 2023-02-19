@@ -1,0 +1,17 @@
+--@name component
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@server
+
+
+Component = class("Component")
+function Component:initialize()
+    self.linkedObject = nil
+end
+
+function Component:linkObject(obj)
+    self.linkedObject = obj
+end
+
+function Component:getLinkedObject()
+    return self.linkedObject
+end

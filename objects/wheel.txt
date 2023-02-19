@@ -1,0 +1,40 @@
+--@name wheel
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@server
+
+
+Wheel = class("Wheel")
+function Wheel:initialize(entity)
+    if entity == nil then error("Must attach an entity to the engine!") return end
+    
+    self.entity = entity
+end
+
+/*
+    TODO:
+        find a better way to apply torque because this currently will not work for AWD vehicles.
+        
+        The problem is that when the front wheels turn, the torque axis does not turn. this results in a lower amount of torque being applied to the front wheels.
+        We'll probably just want to copy how ACF handles torque axis.
+*/
+
+function Wheel:getEntity()
+    return self.entity
+end
+
+function Wheel:getPos()
+    return self.entity:getPos()
+end
+
+function Wheel:getAxis()
+    return self.entity:getRight()
+end
+
+function Wheel:getAngleVelocity()
+    return self.entity:getAngleVelocity()
+end
+
+function Wheel:applyTorque(tq)
+    
+    self.entity:applyTorque(-tq)
+end

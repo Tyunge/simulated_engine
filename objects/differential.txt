@@ -1,0 +1,61 @@
+--@name differential
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@include simulated_engine/objects/component.txt
+--@server
+dofile("simulated_engine/objects/component.txt")
+
+Differential = class("Differential",Component)
+function Differential:initialize(entity, finalRatio)
+    if entity == nil then error("Must attach an entity to differential!") return end
+    self.entity = entity
+    self.finalRatio = finalRatio or 4.063
+    
+    self.inputTorque = 0
+    self.outputTorque = 0
+    
+    self.gearRPM = 0
+end
+
+/*
+    Basic Open Differential
+    
+    How it works:
+        Grab the torque from the transmission and multiply it by the ratio and divide it by the number of wheels connected. (usually 2)
+        
+        Calculate average wheel rpm and multiply it by the ratio then store the value (self.gearRPM)
+        The transmission will then take the gear rpm and multiply it again by its ratio and store the value again for its gear RPM
+
+*/
+
+function Differential:think()
+    self.outputTorque = (self.inputTorque*self.finalRatio)/#self:getLinkedObject()
+    
+    local wheelRPM = 0
+    for k, wh in pairs(self:getLinkedObject()) do
+    
+        wh:applyTorque(self.entity:getForward()*self.outputTorque)
+        
+        local rpm = math.abs(wh:getAngleVelocity():dot(Vector(0,1,0))) / 6
+
+        
+        wheelRPM = wheelRPM + rpm
+    end
+    wheelRPM = wheelRPM/#self:getLinkedObject()
+    
+    
+    self.gearRPM = wheelRPM*self.finalRatio
+
+end
+
+
+function Differential:setInputTorque(num)
+    self.inputTorque = num
+end
+
+function Differential:getOutputTorque()
+    return self.outputTorque
+end
+
+function Differential:getGearRPM()
+    return self.gearRPM
+end

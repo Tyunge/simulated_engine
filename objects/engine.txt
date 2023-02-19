@@ -1,0 +1,188 @@
+--@name engine
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@include simulated_engine/objects/component.txt
+--@server
+dofile("simulated_engine/objects/component.txt")
+
+Engine = class("Engine",Component)
+function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
+    if entity == nil then error("Must attach an entity to the engine!") return end
+    
+    self.entity = entity
+    self.active = false
+
+    self.throttle = 0
+
+    self.idleRPM = idleRPM or 800
+    self.redline = redline or 8000
+    self.peakTorque = peakTorque or 122
+    self.flyWheelMass = flyWheelMass or 5
+    self.flyWheelInertia = 0.5*(self.flyWheelMass*0.2)
+    
+    
+    self.rpm = 0
+    
+    self.unloadedRPM = 0
+    self.actualRPM = 0
+    self.outputTorque = 0
+    
+    self.snd = sound.create(self.entity,"acf_base/engines/i5_petrolsmall.wav")
+        self.snd:play()
+        self.snd:setVolume(0)
+        
+    self.torqueGraph = {0,0.35,0.6,0.8,1,0.9,0.75,0.5} //4 sets of points
+    
+    print(#self.torqueGraph)
+end
+
+function Engine:think()
+    self:updateSounds()
+    self:calculateTorque()
+    local transmission = self:getLinkedObject()
+    local clutch = transmission:getClutch()
+    
+    //This is real rpm of the engine when connected to the wheels
+    self.actualRPM = transmission:getGearRPM()
+    
+    /*
+        TODO:
+            -- Find a better deceleration due to friction technique
+            -- Remove if statement for when in gear
+            -- Remove clamp from engine rpm
+    */
+    
+    //This controls how fast the rpm should accelerate when in neutral or clutch is disengaged
+    local engineAccleration = (self.outputTorque/self.flyWheelInertia) - ((self.rpm*0.0025)/self.flyWheelInertia)
+    
+    
+
+    if self:getLinkedObject():getGear() == 0 then
+        self.rpm = self.rpm + engineAccleration
+    else
+    
+        //This mixes the realRPM with the "fake" out of gear rpm. This will allow for clutch slipping
+        self.rpm = ((self.rpm + engineAccleration)*clutch) + ((1-clutch)*self.actualRPM)
+    end
+
+    
+    //Simple way to keep idle rpm and limit over revving. Should eventually be replaced with a realistic system that uses an idle valve/throttle to control RPM and power cutout to stop overrevving.
+    self.rpm = math.clamp(self.rpm, self.idleRPM, self.redline)
+    
+    //Send the engine torque to the transmission
+    transmission:setInputTorque(self.outputTorque)
+end
+
+
+//Simple sound FX
+function Engine:updateSounds()
+    local rpmRatio = self.rpm/self.redline
+    
+    self.snd:setVolume( math.clamp(rpmRatio,0.1,0.5) )
+    self.snd:setPitch( rpmRatio*200 )
+end
+
+/*
+    Torque Curve calculation
+    
+    https://en.wikipedia.org/wiki/Cubic_Hermite_spline
+    
+    This is using a Hermite Curve interpolation to generate a torque curve.
+    This works by splitting the rpm range from idle => redline into sections. 
+    The number of section are the number of points in the torque graph divided in half
+    Ex. 
+        if you have 8 numbers in the torqueGraph table then the number of torque sections in the rpm range is 4.
+    
+    You can have as many points in the torque graph as long as it's an even number
+    
+    I chose this because it allows for any number of points while still producing a nice smooth curve    
+*/
+function Engine:calculateTorque()
+    local slope1, slope2 = 0, 0
+    local rpmRatio = self.rpm/self.redline
+    local numberOfTorquePoints = #self.torqueGraph
+    local sections = numberOfTorquePoints/2
+    
+    local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections )
+    local rpmSectionRatio = (rpmRatio*sections)%1
+    
+    local torqueMin, torqueMax = self.torqueGraph[ (rpmSection*2)-1 ], self.torqueGraph[ (rpmSection*2) ]
+    
+    
+    if rpmSection > 1 then
+        slope1 = 0.5*(self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection-1])
+    else
+        slope2 = self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection]
+    end
+    
+    
+    if rpmSection < numberOfTorquePoints-2 then
+        slope2 = 0.5*(self.torqueGraph[rpmSection+2]-self.torqueGraph[rpmSection])
+    else
+        slope2 = self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection]
+    end
+    
+    self.outputTorque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.throttle*self.peakTorque)
+    
+    if self.rpm > self.redline then
+        self.outputTorque = 0
+    end
+    
+end
+
+/* Getters */
+function Engine:getEntity()
+    return self.entity
+end
+
+function Engine:getActive()
+    return self.active
+end
+
+function Engine:getIdleRPM()
+    return self.idleRPM
+end
+
+function Engine:getRedline()
+    return self.redline
+end
+
+function Engine:getPeakTorque()
+    return self.peakTorque
+end
+
+function Engine:getRPM()
+    return self.rpm
+end
+
+function Engine:getOutputTorque()
+    return self.outputTorque
+end
+
+function Engine:getThrottle()
+    return self.throttle
+end
+
+/* Setters */
+function Engine:setActive(bool)
+    self.active = bool
+end
+
+function Engine:setUnloadedRPM(rpm)
+    self.unloadedRPM = rpm
+end
+
+function Engine:setLoadedRPM(rpm)
+    self.loadedRPM = rpm
+end
+
+function Engine:setRPM(rpm)
+    self.rpm = rpm
+end
+
+function Engine:setOutputTorque(torque)
+    self.outputTorque = torque
+end
+
+function Engine:setThrottle(perc)
+    self.throttle = perc
+end
