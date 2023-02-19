@@ -107,7 +107,8 @@ hook.add("tick","main",function()
     
     sEngine:setThrottle(pod.W)
     
-    sTransmission:setClutch( math.approach(sTransmission:getClutch(), pod.Shift, 0.1) )
+    sTransmission:setClutch( pod.Shift )
+    //sTransmission:setClutch( math.approach(sTransmission:getClutch(), pod.Shift, 0.1) )
     
     
     wire.ports.Torque = sEngine:getOutputTorque()
