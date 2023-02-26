@@ -17,8 +17,7 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
     self.redline = redline or 8000
     self.peakTorque = peakTorque or 122
     self.flyWheelMass = flyWheelMass or 5
-    self.flyWheelInertia = 0.5*(self.flyWheelMass*0.2)
-    
+    self.flyWheelInertia = (self.flyWheelMass * (0.263^3))/2 //0.5*(self.flyWheelMass*0.2)
     
     self.rpm = 0
     
@@ -29,23 +28,29 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
         self.snd:play()
         self.snd:setVolume(0)
         
-    self.torqueGraph = {0.25,0.35,0.6,0.8,1,0.9,0.75,0.5} //4 sets of points
+    self.torqueGraph = {0.4,0.5,0.6,0.8,0.75,1,0.75,0.6} //4 sets of points
+
 end
 
 function Engine:think()
     self:updateSounds()
-    self:calculateTorque()
+    self.outputTorque = self:calculateTorque(self.rpm)*self.throttle
     local transmission = self:getLinkedObject()
     local clutch = transmission:getClutch()
     
+
+    local cylinders = 6
+    local engineLiters = 2.5 //divide this by 1000
+    local engineBrakingTorque = ( engineLiters*math.rad(self.rpm) * (1-self.throttle) )/self.flyWheelMass //(0.5)*self:calculateTorque(self.rpm)*(1-self.throttle) //( ( (100000)*(0.0025)/(2*3.1415*2) ) / 1.356 )*(1-math.sign(self.throttle))
+
     
     /*
         Clutch reaction torque
     */
     
-    local strength = 50
-    local reactionTorque = math.rad(self.rpm-self.actualRPM)*self.flyWheelInertia*strength
-    //local reactionTorque = 0
+    //local strength = 50
+    //local reactionTorque = math.rad(self.rpm-self.actualRPM)*self.flyWheelInertia*strength
+    local reactionTorque = 0
     
     //This is real rpm of the engine when connected to the wheels
     self.actualRPM = transmission:getGearRPM()
@@ -58,8 +63,8 @@ function Engine:think()
     */
     
     //This controls how fast the rpm should accelerate when in neutral or clutch is disengaged
-    local engineFriction = (math.rad(self.rpm)*0.3)/self.flyWheelInertia
-    local engineAcceleration = (self.outputTorque/self.flyWheelInertia)
+    local engineFriction =  0 //math.rad( self.rpm*0.25 )*self.flyWheelInertia //math.rad( self.rpm/self.flyWheelInertia )*0.1 //math.rad( (self.rpm*0.1)/self.flyWheelInertia ) //(math.rad(self.rpm)*0.2)/self.flyWheelInertia
+    local engineAcceleration = math.rad( self.outputTorque-(engineBrakingTorque*3) )/self.flyWheelInertia //math.rad( (self.outputTorque/self.flyWheelInertia) )
     
     //self.rpm = math.max( (self.rpm+(engineAcceleration)*clutch) - engineFriction, self.actualRPM )
 
@@ -79,7 +84,7 @@ function Engine:think()
     self.rpm = math.clamp(self.rpm, self.idleRPM, self.redline)
     
     //Send the engine torque to the transmission
-    transmission:setInputTorque(self.outputTorque+reactionTorque)
+    transmission:setInputTorque(self.outputTorque-engineBrakingTorque)
 end
 
 
@@ -106,9 +111,9 @@ end
     
     I chose this because it allows for any number of points while still producing a nice smooth curve    
 */
-function Engine:calculateTorque()
+function Engine:calculateTorque(rpm)
     local slope1, slope2 = 0, 0
-    local rpmRatio = self.rpm/self.redline
+    local rpmRatio = rpm/self.redline
     local numberOfTorquePoints = #self.torqueGraph
     local sections = numberOfTorquePoints/2
     
@@ -131,12 +136,13 @@ function Engine:calculateTorque()
         slope2 = self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection]
     end
     
-    self.outputTorque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.throttle*self.peakTorque)
+    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.peakTorque)
     
     if self.rpm > self.redline then
-        self.outputTorque = 0
+        torque = 0
     end
     
+    return torque 
 end
 
 function Engine:resetSounds()

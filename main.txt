@@ -78,7 +78,7 @@ end
 local pod = wire.ports.POD
 
 //Creating the objects
-local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 265, 5)
+local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 300, 4)
 local sTransmission = Transmission:new(wire.ports.Transmission,ratios)
 local sDifferential = Differential:new(wire.ports.Differential,final)
 
@@ -107,5 +107,7 @@ hook.add("tick","update",function()
     wire.ports.Torque = sEngine:getOutputTorque()
     wire.ports.Gear = sTransmission:getGear()
     wire.ports.Clutch = sTransmission:getClutch()
+    wire.ports.TransmissionOutputTorque = sTransmission:getOutputTorque()
+    wire.ports.DifferentialTorque = sDifferential:getOutputTorque()
     
 end)

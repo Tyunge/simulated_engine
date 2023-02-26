@@ -45,7 +45,7 @@ function Differential:think()
     wheelRPM = wheelRPM/#self:getLinkedObject()
     
     
-    self.parentEntity:applyTorque( self.entity:getForward() * self.outputTorque )
+    self.parentEntity:applyTorque( self.entity:getForward() * self.outputTorque*#self:getLinkedObject() )
     
     self.gearRPM = wheelRPM*math.abs(self.finalRatio)
 
