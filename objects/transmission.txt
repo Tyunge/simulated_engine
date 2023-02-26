@@ -95,14 +95,18 @@ function Transmission:gearUp()
     local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
     self.gear = math.clamp(self.gear+1, minimumRatioIndex, #self.ratios)
     
-    self.rpmMatch = 1
+    if self.gear != 0 then
+        self.rpmMatch = 1
+    end
 end
 
 function Transmission:gearDown()
     local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
     self.gear = math.clamp(self.gear-1, minimumRatioIndex, #self.ratios)
     
-    self.rpmMatch = -1
+    if self.gear != 0 then
+        self.rpmMatch = -1
+    end
 end
 
 function Transmission:setGear(num)

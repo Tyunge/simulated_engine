@@ -57,16 +57,17 @@ dodir("simulated_engine/objects")
 local wheels = {}
 
 local ratios = {
-    [-1] = -2.923,
+    [-1] = -3.34,
     [0] = 0,
-    [1] = 3.250,
-    [2] = 2.550,
-    [3] = 1.572,
-    [4] = 1.211,
-    [5] = 1.005
+    [1] = 3.23,
+    [2] = 1.950,
+    [3] = 1.32,
+    [4] = 1.02,
+    [5] = 0.95,
+    [6] = 0.9
 }
 
-local final = 4.063
+local final = 4.06
 
 //Create the wheel objects
 for k, v in pairs(wire.ports.Wheels) do
@@ -77,7 +78,7 @@ end
 local pod = wire.ports.POD
 
 //Creating the objects
-local sEngine = Engine:new(wire.ports.Engine, 800, 8000, 144, 5)
+local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 265, 5)
 local sTransmission = Transmission:new(wire.ports.Transmission,ratios)
 local sDifferential = Differential:new(wire.ports.Differential,final)
 

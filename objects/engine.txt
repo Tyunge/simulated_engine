@@ -58,7 +58,7 @@ function Engine:think()
     */
     
     //This controls how fast the rpm should accelerate when in neutral or clutch is disengaged
-    local engineFriction = (self.rpm*0.0025)/self.flyWheelInertia
+    local engineFriction = (math.rad(self.rpm)*0.3)/self.flyWheelInertia
     local engineAcceleration = (self.outputTorque/self.flyWheelInertia)
     
     //self.rpm = math.max( (self.rpm+(engineAcceleration)*clutch) - engineFriction, self.actualRPM )
@@ -87,7 +87,7 @@ end
 function Engine:updateSounds()
     local rpmRatio = self.rpm/self.redline
     
-    self.snd:setVolume( math.clamp(rpmRatio,0.1,0.5) )
+    self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
     self.snd:setPitch( rpmRatio*200 )
 end
 
@@ -137,6 +137,13 @@ function Engine:calculateTorque()
         self.outputTorque = 0
     end
     
+end
+
+function Engine:resetSounds()
+    self.snd:destroy()
+    self.snd = sound.create(self.entity,"acf_base/engines/i5_petrolsmall.wav")
+        self.snd:play()
+        self.snd:setVolume(0)
 end
 
 /* Getters */

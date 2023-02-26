@@ -23,6 +23,10 @@ function Controller:keyPress(key)
     if key == 2048 then
         self.transmission:gearDown()
     end
+    
+    if key == 8192 then
+        self.engine:resetSounds()
+    end
 end
 
 function Controller:keyRelease(key)
@@ -64,7 +68,7 @@ function Controller:think()
     else
     
         
-        self.engine:setThrottle(self.pod.W)
+        self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
         self.transmission:setClutch(self.pod.Shift)
     
     end
