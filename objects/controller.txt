@@ -1,0 +1,73 @@
+--@name Controller
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@shared
+
+Controller = class("Controller")
+function Controller:initialize(Engine, Transmission, Differential, POD)
+    if Engine == nil or Transmission == nil or Differential == nil or POD == nil then error("Must link Engine, Transmission, Differential, and POD to Controller") return end
+    
+    self.engine = Engine
+    self.transmission = Transmission
+    self.differential = Differential
+    self.pod = POD 
+    
+    self.data = {}
+end
+
+function Controller:keyPress(key)
+    
+    if key == 1 then
+        self.transmission:gearUp()
+    end
+    
+    if key == 2048 then
+        self.transmission:gearDown()
+    end
+end
+
+function Controller:keyRelease(key)
+end
+
+function Controller:think()
+    self.engine:think()
+    self.transmission:think()
+    self.differential:think()
+    
+    self.data[1] = self.engine:getRPM()
+    self.data[2] = self.engine:getOutputTorque()
+    self.data[3] = self.transmission:getGear()
+    self.data[4] = self.transmission:getClutch()
+    self.data[5] = self.transmission:getOutputTorque()
+    self.data[6] = self.differential:getOutputTorque()
+    
+    
+    if self.transmission:getRPMMatch() != 0 then
+        self.transmission:setClutch(1)
+        self.engine:setThrottle(0)
+        
+        if self.transmission:getRPMMatch() == 1 then
+            if self.engine:getRPM() <= self.transmission:getGearRPM() then
+                self.transmission:disableRPMMatch()
+            end
+        end
+        
+        
+        if self.transmission:getRPMMatch() == -1 then
+            self.engine:setThrottle(1)
+            
+            if self.engine:getRPM() >= self.transmission:getGearRPM() then
+                self.transmission:disableRPMMatch()
+            end
+        end
+
+        
+    else
+    
+        
+        self.engine:setThrottle(self.pod.W)
+        self.transmission:setClutch(self.pod.Shift)
+    
+    end
+    
+    return self.data
+end

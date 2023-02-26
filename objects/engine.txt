@@ -22,7 +22,6 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
     
     self.rpm = 0
     
-    self.unloadedRPM = 0
     self.actualRPM = 0
     self.outputTorque = 0
     
@@ -30,7 +29,7 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
         self.snd:play()
         self.snd:setVolume(0)
         
-    self.torqueGraph = {0,0.35,0.6,0.8,1,0.9,0.75,0.5} //4 sets of points
+    self.torqueGraph = {0.25,0.35,0.6,0.8,1,0.9,0.75,0.5} //4 sets of points
 end
 
 function Engine:think()
@@ -44,9 +43,9 @@ function Engine:think()
         Clutch reaction torque
     */
     
-    local strength = 25
+    local strength = 50
     local reactionTorque = math.rad(self.rpm-self.actualRPM)*self.flyWheelInertia*strength
-    
+    //local reactionTorque = 0
     
     //This is real rpm of the engine when connected to the wheels
     self.actualRPM = transmission:getGearRPM()
@@ -59,18 +58,22 @@ function Engine:think()
     */
     
     //This controls how fast the rpm should accelerate when in neutral or clutch is disengaged
-    local engineAccleration = (self.outputTorque/self.flyWheelInertia) - ((self.rpm*0.0025)/self.flyWheelInertia)
+    local engineFriction = (self.rpm*0.0025)/self.flyWheelInertia
+    local engineAcceleration = (self.outputTorque/self.flyWheelInertia)
     
-    
+    //self.rpm = math.max( (self.rpm+(engineAcceleration)*clutch) - engineFriction, self.actualRPM )
 
-    if self:getLinkedObject():getGear() == 0 then
-        self.rpm = self.rpm + engineAccleration
+    if transmission:getClutch() > 0 or transmission:getGear() == 0 then
+        self.rpm = self.rpm + engineAcceleration - engineFriction
     else
-    
-        //This mixes the realRPM with the "fake" out of gear rpm. This will allow for clutch slipping
-        self.rpm = ((self.rpm + engineAccleration)*clutch) + ((1-clutch)*self.actualRPM)
+        self.rpm = self.actualRPM
     end
 
+    
+    if transmission:getGear() == 0 then
+        self.rpm = self.rpm + engineAcceleration - engineFriction
+    end
+    
     
     //Simple way to keep idle rpm and limit over revving. Should eventually be replaced with a realistic system that uses an idle valve/throttle to control RPM and power cutout to stop overrevving.
     self.rpm = math.clamp(self.rpm, self.idleRPM, self.redline)

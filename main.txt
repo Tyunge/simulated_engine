@@ -60,10 +60,10 @@ local ratios = {
     [-1] = -2.923,
     [0] = 0,
     [1] = 3.250,
-    [2] = 1.950,
-    [3] = 1.172,
-    [4] = 0.811,
-    [5] = 0.605
+    [2] = 2.550,
+    [3] = 1.572,
+    [4] = 1.211,
+    [5] = 1.005
 }
 
 local final = 4.063
@@ -77,44 +77,33 @@ end
 local pod = wire.ports.POD
 
 //Creating the objects
-local sEngine = Engine:new(wire.ports.Engine, 800, 8000, 122, 5)
+local sEngine = Engine:new(wire.ports.Engine, 800, 8000, 144, 5)
 local sTransmission = Transmission:new(wire.ports.Transmission,ratios)
 local sDifferential = Differential:new(wire.ports.Differential,final)
+
 
 sEngine:linkObject(sTransmission)
 sTransmission:linkObject(sDifferential)
 sDifferential:linkObject(wheels)
 
+local ECU = Controller:new(sEngine, sTransmission, sDifferential,pod)
 
-//Basic ECU controls
-hook.add("KeyPress","btnPress",function(ply,key)
+hook.add("KeyPress","input",function(ply,key)
     if ply != pod.Driver then return end
-    
-    if key == 1 then
-        sTransmission:gearUp()
-    end
-    
-    if key == 2048 then
-        sTransmission:gearDown()
-    end
+    ECU:keyPress(key)
 end)
 
+hook.add("KeyRelease","input",function(ply,key)
+    if ply != pod.Driver then return end
+    ECU:keyRelease(key)
+end)
 
-hook.add("tick","main",function()
-    sEngine:think()
-    sTransmission:think()
-    sDifferential:think()
+hook.add("tick","update",function()
+    local data = ECU:think()
     
-    sEngine:setThrottle(pod.W)
-    
-    sTransmission:setClutch( pod.Shift )
-    //sTransmission:setClutch( math.approach(sTransmission:getClutch(), pod.Shift, 0.1) )
-    
-    
-    wire.ports.Torque = sEngine:getOutputTorque()
     wire.ports.RPM = sEngine:getRPM()
+    wire.ports.Torque = sEngine:getOutputTorque()
     wire.ports.Gear = sTransmission:getGear()
     wire.ports.Clutch = sTransmission:getClutch()
-    wire.ports.TransmissionOutputTorque = sTransmission:getOutputTorque()
-    wire.ports.DifferentialTorque = sDifferential:getOutputTorque()
+    
 end)
