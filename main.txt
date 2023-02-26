@@ -42,7 +42,7 @@
 */
 
 wire.adjustInputs({"POD","Engine","Transmission","Differential","Wheels"},{"wirelink","entity","entity","entity","array"})
-wire.adjustOutputs({"RPM", "Torque","Gear","Clutch","TransmissionOutputTorque","DifferentialTorque"},{"number","number","number","number","number","number"})
+wire.adjustOutputs({"RPM","Throttle", "Torque","Gear","Clutch","TransmissionOutputTorque","DifferentialTorque"},{"number","number", "number","number","number","number","number"})
 allInputsWired = true
 
 //Check if everything is wired.
@@ -102,6 +102,7 @@ hook.add("tick","update",function()
     local data = ECU:think()
     
     wire.ports.RPM = sEngine:getRPM()
+    wire.ports.Throttle = sEngine:getThrottle()
     wire.ports.Torque = sEngine:getOutputTorque()
     wire.ports.Gear = sTransmission:getGear()
     wire.ports.Clutch = sTransmission:getClutch()
