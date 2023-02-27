@@ -17,10 +17,12 @@ function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
     self.redline = redline or 8000
     self.peakTorque = peakTorque or 122
     self.flyWheelMass = flyWheelMass or 5
-    self.flyWheelInertia = (self.flyWheelMass * (0.263^3))/2 //0.5*(self.flyWheelMass*0.2)
+    self.flyWheelInertia = (self.flyWheelMass * (0.131675^2))/2 //0.5*(self.flyWheelMass*0.2)
+    
     
     self.rpm = 0
     
+    self.flywheelRPM = 0
     self.actualRPM = 0
     self.outputTorque = 0
     
@@ -38,53 +40,18 @@ function Engine:think()
     local transmission = self:getLinkedObject()
     local clutch = transmission:getClutch()
     
-
-    local cylinders = 6
-    local engineLiters = 2.5 //divide this by 1000
-    local engineBrakingTorque = ( engineLiters*math.rad(self.rpm) * (1-self.throttle) )/self.flyWheelMass //(0.5)*self:calculateTorque(self.rpm)*(1-self.throttle) //( ( (100000)*(0.0025)/(2*3.1415*2) ) / 1.356 )*(1-math.sign(self.throttle))
-
-    
-    /*
-        Clutch reaction torque
-    */
-    
-    //local strength = 50
-    //local reactionTorque = math.rad(self.rpm-self.actualRPM)*self.flyWheelInertia*strength
-    local reactionTorque = 0
-    
-    //This is real rpm of the engine when connected to the wheels
     self.actualRPM = transmission:getGearRPM()
     
-    /*
-        TODO:
-            -- Find a better deceleration due to friction technique
-            -- Remove if statement for when in gear
-            -- Remove clamp from engine rpm
-    */
+    local engineAcceleration = math.rad(self.outputTorque/self.flyWheelInertia)
+    local flyWheelTorque = (math.rad( self.rpm )/self.flyWheelMass)*(1-math.sign(self.throttle))
     
-    //This controls how fast the rpm should accelerate when in neutral or clutch is disengaged
-    local engineFriction =  0 //math.rad( self.rpm*0.25 )*self.flyWheelInertia //math.rad( self.rpm/self.flyWheelInertia )*0.1 //math.rad( (self.rpm*0.1)/self.flyWheelInertia ) //(math.rad(self.rpm)*0.2)/self.flyWheelInertia
-    local engineAcceleration = math.rad( self.outputTorque-(engineBrakingTorque*3) )/self.flyWheelInertia //math.rad( (self.outputTorque/self.flyWheelInertia) )
+    self.flywheelRPM = ( ( self.flywheelRPM + ( engineAcceleration - flyWheelTorque ) )*math.sign(clutch) ) + self.actualRPM*(1-math.sign(clutch))
+    self.flywheelRPM = math.clamp( self.flywheelRPM, self.idleRPM, self.redline)
     
-    //self.rpm = math.max( (self.rpm+(engineAcceleration)*clutch) - engineFriction, self.actualRPM )
-
-    if transmission:getClutch() > 0 or transmission:getGear() == 0 then
-        self.rpm = self.rpm + engineAcceleration - engineFriction
-    else
-        self.rpm = self.actualRPM
-    end
-
+    self.rpm = (self.flywheelRPM*clutch) + self.actualRPM*(1-clutch)
     
-    if transmission:getGear() == 0 then
-        self.rpm = self.rpm + engineAcceleration - engineFriction
-    end
-    
-    
-    //Simple way to keep idle rpm and limit over revving. Should eventually be replaced with a realistic system that uses an idle valve/throttle to control RPM and power cutout to stop overrevving.
-    self.rpm = math.clamp(self.rpm, self.idleRPM, self.redline)
-    
-    //Send the engine torque to the transmission
-    transmission:setInputTorque(self.outputTorque-engineBrakingTorque)
+    self.rpm = math.clamp(self.rpm,self.idleRPM, self.redline)
+    transmission:setInputTorque(self.outputTorque)
 end
 
 
@@ -138,7 +105,7 @@ function Engine:calculateTorque(rpm)
     
     local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.peakTorque)
     
-    if self.rpm > self.redline then
+    if self.rpm >= self.redline then
         torque = 0
     end
     

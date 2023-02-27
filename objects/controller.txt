@@ -45,33 +45,9 @@ function Controller:think()
     self.data[6] = self.differential:getOutputTorque()
     
     
-    if self.transmission:getRPMMatch() != 0 then
-        self.transmission:setClutch(1)
-        self.engine:setThrottle(0)
         
-        if self.transmission:getRPMMatch() == 1 then
-            if self.engine:getRPM() <= self.transmission:getGearRPM() then
-                self.transmission:disableRPMMatch()
-            end
-        end
-        
-        
-        if self.transmission:getRPMMatch() == -1 then
-            self.engine:setThrottle(1)
-            
-            if self.engine:getRPM() >= self.transmission:getGearRPM() then
-                self.transmission:disableRPMMatch()
-            end
-        end
-
-        
-    else
-    
-        
-        self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
-        self.transmission:setClutch(self.pod.Shift)
-    
-    end
+    self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
+    self.transmission:setClutch( math.approach( self.transmission:getClutch(), self.pod.Shift, 0.05) )
     
     return self.data
 end

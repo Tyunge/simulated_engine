@@ -27,12 +27,14 @@ function Transmission:initialize(entity, ratios)
     self.inputTorque = 0
     self.outputTorque = 0
     self.gearRPM = 0
-    
-    self.rpmMatch = 0 // -1 : gear changed down. 0 : disabled. 1 : gear changed up 
+
+    self.shiftTime = 0.25 //in seconds
+    self.shiftCt = 0
 end
 
 function Transmission:think()
     local differential = self:getLinkedObject()
+    local ct = timer.curtime()
 
     self.ratio = self.ratios[self.gear]
     self.outputTorque = self.inputTorque*self.ratio*(1-self.clutch) 
@@ -76,9 +78,6 @@ function Transmission:getGearRPM()
     return self.gearRPM
 end
 
-function Transmission:getRPMMatch()
-    return self.rpmMatch
-end
 
 
 /* Setters */
@@ -88,32 +87,31 @@ function Transmission:setInputTorque(num)
 end
 
 function Transmission:setClutch(num)
-    self.clutch = math.clamp(num,0,1)
+    local ct = timer.curtime()
+    
+    if ct < self.shiftCt+self.shiftTime then
+        self.clutch = 1
+    else
+        self.clutch = math.clamp(num,0,1)
+    end
+    
 end
 
 function Transmission:gearUp()
     local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
     self.gear = math.clamp(self.gear+1, minimumRatioIndex, #self.ratios)
     
-    if self.gear != 0 then
-        self.rpmMatch = 1
-    end
+    self.shiftCt = timer.curtime()
+
 end
 
 function Transmission:gearDown()
     local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
     self.gear = math.clamp(self.gear-1, minimumRatioIndex, #self.ratios)
-    
-    if self.gear != 0 then
-        self.rpmMatch = -1
-    end
+    self.shiftCt = timer.curtime()
 end
 
 function Transmission:setGear(num)
     local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
     self.gear = math.clamp(num, minimumRatioIndex, #self.ratios)
-end
-
-function Transmission:disableRPMMatch()
-    self.rpmMatch = 0
 end
