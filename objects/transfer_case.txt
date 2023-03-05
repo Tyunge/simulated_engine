@@ -1,0 +1,44 @@
+--@name transfer_case
+--@author Tyunge [ STEAM_0:0:78909614 ]
+--@include simulated_engine/objects/component.txt
+--@server
+dofile("simulated_engine/objects/component.txt")
+
+
+TransferCase = class("TransferCase",Component)
+function TransferCase:initialize(entity,bias)
+    if entity == nil then error("must link an entity to the transfer case") return end
+    self.entity = entity
+    self.bias = bias or 0
+    self.inputTorque = 0
+    
+    self.gearRPM = 0
+    
+    self.outputTorqueOne = 0
+    self.outputTorqueTwo = 0
+    
+    self.differentials = {}
+end
+
+function TransferCase:think()
+    
+    self.differentials[1]:setInputTorque(self.outputTorqueOne)
+    self.differentials[2]:setInputTorque(self.outputTorqueTwo)
+    
+    self.gearRPM = (self.differentials[1]:getGearRPM() + self.differentials[2]:getGearRPM())/2
+end
+
+function TransferCase:addDifferential(obj)
+    table.insert(self.differentials,obj)
+end
+
+function TransferCase:setInputTorque(tq)
+    self.inputTorque = tq
+    
+    self.outputTorqueOne = tq/2
+    self.outputTorqueTwo = tq/2
+end
+
+function TransferCase:getGearRPM()
+    return self.gearRPM
+end

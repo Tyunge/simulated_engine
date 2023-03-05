@@ -3,12 +3,14 @@
 --@shared
 
 Controller = class("Controller")
-function Controller:initialize(Engine, Transmission, Differential, POD)
-    if Engine == nil or Transmission == nil or Differential == nil or POD == nil then error("Must link Engine, Transmission, Differential, and POD to Controller") return end
+function Controller:initialize(Engine, Transmission, TransferCase, DifferentialOne, DifferentialTwo, POD)
+    if Engine == nil or Transmission == nil or Differential == nil or POD == nil then error("Must link all components to controller") return end
     
     self.engine = Engine
     self.transmission = Transmission
-    self.differential = Differential
+    self.transferCase = TransferCase
+    self.differentialOne = DifferentialOne
+    self.differentialTwo = DifferentialTwo
     self.pod = POD 
     
     self.data = {}
@@ -35,19 +37,27 @@ end
 function Controller:think()
     self.engine:think()
     self.transmission:think()
-    self.differential:think()
+    self.transferCase:think()
+    self.differentialOne:think()
+    self.differentialTwo:think()
     
     self.data[1] = self.engine:getRPM()
     self.data[2] = self.engine:getOutputTorque()
     self.data[3] = self.transmission:getGear()
     self.data[4] = self.transmission:getClutch()
     self.data[5] = self.transmission:getOutputTorque()
-    self.data[6] = self.differential:getOutputTorque()
+    self.data[6] = 0//self.differential:getOutputTorque()
     
+    self.differentialOne:setBrake( math.approach(self.differentialOne:getBrake(), self.pod.S, 1) )
+    self.differentialTwo:setBrake( math.approach(self.differentialOne:getBrake(), self.pod.S, 1) )
     
-        
-    self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
-    self.transmission:setClutch( math.approach( self.transmission:getClutch(), self.pod.Shift, 0.05) )
+    if self.transmission:changingGears() then
+        self.engine:setThrottle(0)
+    else
+        self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
+    end
+    
+    self.transmission:setClutch( math.approach( self.transmission:getClutch(), self.pod.Shift, 0.1) )
     
     return self.data
 end

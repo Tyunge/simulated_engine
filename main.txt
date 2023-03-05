@@ -41,7 +41,7 @@
     The torque graph for the engine is not though.
 */
 
-wire.adjustInputs({"POD","Engine","Transmission","Differential","Wheels"},{"wirelink","entity","entity","entity","array"})
+wire.adjustInputs({"POD","Engine","Transmission","TransferCase","DifferentialOne","DifferentialTwo","WheelSetOne","WheelSetTwo"},{"wirelink","entity","entity","entity","entity","entity","array","array"})
 wire.adjustOutputs({"RPM","Throttle", "Torque","Gear","Clutch","TransmissionOutputTorque","DifferentialTorque"},{"number","number", "number","number","number","number","number"})
 allInputsWired = true
 
@@ -54,7 +54,8 @@ end
 if not allInputsWired then return end
 
 dodir("simulated_engine/objects")
-local wheels = {}
+local WheelSetOne = {}
+local WheelSetTwo = {}
 
 local ratios = {
     [-1] = -3.34,
@@ -70,24 +71,39 @@ local ratios = {
 local final = 4.06
 
 //Create the wheel objects
-for k, v in pairs(wire.ports.Wheels) do
+for k, v in pairs(wire.ports.WheelSetOne) do
     local newWheel = Wheel:new(v)
-    table.insert(wheels,newWheel)
+    table.insert(WheelSetOne,newWheel)
+end
+
+for k, v in pairs(wire.ports.WheelSetTwo) do
+    local newWheel = Wheel:new(v)
+    table.insert(WheelSetTwo,newWheel)
 end
 
 local pod = wire.ports.POD
 
 //Creating the objects
-local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 220, 6)
+local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 220*1.5, 6)
 local sTransmission = Transmission:new(wire.ports.Transmission,ratios)
-local sDifferential = Differential:new(wire.ports.Differential,final)
-
+local sTransferCase = TransferCase:new(wire.ports.TransferCase,0)
+local sDifferentialOne = Differential:new(wire.ports.DifferentialOne,final)
+local sDifferentialTwo = Differential:new(wire.ports.DifferentialTwo,final)
 
 sEngine:linkObject(sTransmission)
-sTransmission:linkObject(sDifferential)
-sDifferential:linkObject(wheels)
+sTransmission:linkObject(sTransferCase)
 
-local ECU = Controller:new(sEngine, sTransmission, sDifferential,pod)
+sTransferCase:addDifferential(sDifferentialOne)
+sTransferCase:addDifferential(sDifferentialTwo)
+
+//sTransferCase:linkObject(sDifferentialOne)
+//sTransferCase:linkObject(sDifferentialTwo)
+
+sDifferentialOne:linkObject(WheelSetOne)
+sDifferentialTwo:linkObject(WheelSetTwo)
+
+
+local ECU = Controller:new(sEngine, sTransmission, sTransferCase, sDifferentialOne, sDifferentialTwo,pod)
 
 hook.add("KeyPress","input",function(ply,key)
     if ply != pod.Driver then return end
@@ -103,11 +119,11 @@ hook.add("tick","update",function()
     local data = ECU:think()
     
     wire.ports.RPM = sEngine:getRPM()
-    wire.ports.Throttle = sEngine:getThrottle()
+    wire.ports.Throttle = (sEngine:getThrottle())*100
     wire.ports.Torque = sEngine:getOutputTorque()
     wire.ports.Gear = sTransmission:getGear()
     wire.ports.Clutch = sTransmission:getClutch()
     wire.ports.TransmissionOutputTorque = sTransmission:getOutputTorque()
-    wire.ports.DifferentialTorque = sDifferential:getOutputTorque()
+    wire.ports.DifferentialTorque = 0//sDifferential:getOutputTorque()
     
 end)
