@@ -2,16 +2,50 @@
 --@author Tyunge [ STEAM_0:0:78909614 ]
 --@server
 
-
 Component = class("Component")
-function Component:initialize()
-    self.linkedObject = nil
+function Component:initialize(wirelink, config)
+    self.wirelink = wirelink
+    self.config = config
+    
+    self.components = {}
+    
+    self.inputTorque = 0
+    self.outputTorque = 0
+
 end
 
-function Component:linkObject(obj)
-    self.linkedObject = obj
+function Component:getWirelink()
+    return self.wirelink
 end
 
-function Component:getLinkedObject()
-    return self.linkedObject
+function Component:getConfig()
+    return self.config
+end
+
+function Component:getInputTorque()
+    return self.inputTorque
+end
+
+function Component:getOutputTorque()
+    return self.outputTorque
+end
+
+function Component:setInputTorque(num)
+    self.inputTorque = num
+end
+
+function Component:setOutputTorque(num)
+    self.outputTorque = num
+end
+
+function Component:linkComponent(component)
+    table.insert(self.components,component)
+end
+
+function Component:getComponents()
+    return self.components
+end
+
+function Component:getEntity()
+    return self.wirelink:entity()
 end

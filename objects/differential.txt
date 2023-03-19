@@ -5,11 +5,12 @@
 dofile("simulated_engine/objects/component.txt")
 
 Differential = class("Differential",Component)
-function Differential:initialize(entity, finalRatio, brakeNM)
-    if entity == nil then error("Must attach an entity to differential!") return end
-    self.entity = entity
-    self.finalRatio = finalRatio or 4.063
+function Differential:initialize(wirelink, config)
+    self.wirelink = wirelink
+    self.entity = self.wirelink:entity()
+    self.config = config
     self.brakeNM = brakeNM or 500
+    self.components = {}
     
     self.inputTorque = 0
     self.outputTorque = 0
@@ -20,6 +21,12 @@ function Differential:initialize(entity, finalRatio, brakeNM)
     self.gearRPM = 0
     
     self.parentEntity = self.entity:getParent()
+    
+    for k, v in pairs(self.wirelink["Entities"]) do
+        local sWheel = Wheel:new(v)
+        table.insert(self.components,sWheel)
+    end
+    
 end
 
 /*
@@ -34,11 +41,11 @@ end
 */
 
 function Differential:think()
-    self.outputTorque = (self.inputTorque*self.finalRatio)/#self:getLinkedObject()
+    self.outputTorque = (self.inputTorque*self.config.ratio)/#self:getComponents()
     
     
     local wheelRPM = 0
-    for k, wh in pairs(self:getLinkedObject()) do
+    for k, wh in pairs(self:getComponents()) do
         
         local angleVelocity = wh:getAngleVelocity():dot(Vector(0,1,0))
         
@@ -54,12 +61,14 @@ function Differential:think()
         
         wheelRPM = wheelRPM + rpm
     end
-    wheelRPM = wheelRPM/#self:getLinkedObject()
+    wheelRPM = wheelRPM/#self:getComponents()
     
     
-    self.parentEntity:applyTorque( self.entity:getForward() * self.outputTorque*#self:getLinkedObject() )
+    if self.parentEntity != nil then
+        self.parentEntity:applyTorque( self.entity:getForward() * self.outputTorque*#self:getComponents() )
+    end
     
-    self.gearRPM = wheelRPM*math.abs(self.finalRatio)
+    self.gearRPM = wheelRPM*math.abs(self.config.ratio)
 
 end
 

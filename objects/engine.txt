@@ -5,73 +5,110 @@
 dofile("simulated_engine/objects/component.txt")
 
 Engine = class("Engine",Component)
-function Engine:initialize(entity, idlePRM, redline, peakTorque, flyWheelMass)
-    if entity == nil then error("Must attach an entity to the engine!") return end
+function Engine:initialize(wirelink,config)
+    self.wirelink = wirelink
+    self.entity = self.wirelink:entity()
+    self.config = config
+    self.components = {}
     
-    self.entity = entity
-    self.active = false
-
+    
+    self.fwRadius = 0.131675 -- meters
+    self.fwMass = self.config.fwMass
+    self.inertia = (self.fwMass*(self.fwRadius^2))/2
+    
+    self.lastCutOff = timer.curtime()
+    
     self.throttle = 0
-
-    self.idleRPM = idleRPM or 800
-    self.redline = redline or 8000
-    self.peakTorque = peakTorque or 122
-    self.flyWheelMass = flyWheelMass or 5
-    self.flyWheelInertia = (self.flyWheelMass * (0.131675^2))/2 //0.5*(self.flyWheelMass*0.2)
-    
-    
     self.rpm = 0
-    
     self.flywheelRPM = 0
     self.actualRPM = 0
-    self.outputTorque = 0
-    self.powerCutoffTime = 0.25
-    self.lastCutoff = timer.curtime()
     
-    self.snd = sound.create(self.entity,"acf_base/engines/i5_petrolsmall.wav")
-        self.snd:play()
-        self.snd:setVolume(0)
-        
-    self.torqueGraph = {0.4,0.5,0.6,0.8,0.75,1,0.75,0.6} //4 sets of points
-
+    self.outputTorque = 0
+    
+    self.snd = nil
+    
+    if self.entity != nil then
+        self.snd = sound.create(self.entity,"acf_base/engines/i5_petrolsmall.wav")
+            self.snd:play()
+            self.snd:setVolume(0)
+    end
+    
+    self:printEngineInfo()
+    
 end
 
 function Engine:think()
     self:updateSounds()
     self.outputTorque = self:calculateTorque(self.rpm)*self.throttle
     
-    local transmission = self:getLinkedObject()
+    local transmission = self:getTransmission()
     local clutch = transmission:getClutch()
-    
-    self.actualRPM = transmission:getGearRPM()
-    
-    local engineAcceleration = math.rad(self.outputTorque/self.flyWheelInertia)
-    local flyWheelTorque = (math.rad( self.rpm )/self.flyWheelMass)*(1-math.sign(self.outputTorque))
-    
     
     local inNuetral = math.sign( math.abs(transmission:getGear()) )
     local inNuetralOrClutched = math.clamp( math.sign(clutch) + (1-inNuetral), 0, 1)
-
     
-    //self.flywheelRPM = ( ( self.flywheelRPM + ( engineAcceleration - flyWheelTorque ) )*math.sign(clutch))  + self.actualRPM*(1-math.sign(clutch))
+    
+    local engineAcceleration = math.rad(self.outputTorque/self.inertia)
+    local flyWheelTorque = (( self.rpm* 0.1047198 )/self.fwMass)*(1-math.sign(self.outputTorque))
+    
     self.flywheelRPM = ( ( self.flywheelRPM + (engineAcceleration - flyWheelTorque) )*inNuetralOrClutched ) + ( self.actualRPM*(1-inNuetralOrClutched) )
-    self.flywheelRPM = math.clamp( self.flywheelRPM, self.idleRPM, self.redline)
+    self.flywheelRPM = math.clamp( self.flywheelRPM, self.config.idle, self.config.redline)
     
     
     local factor = math.clamp(clutch+(1-inNuetral), 0, 1)
     self.rpm = (self.flywheelRPM*factor) + self.actualRPM*(1-factor)
-    
-    self.rpm = math.clamp(self.rpm,self.idleRPM, self.redline)
+    self.rpm = math.clamp(self.rpm,self.config.idle, self.config.redline)
+
+    self.actualRPM = transmission:getGearRPM()
+        
     transmission:setInputTorque(self.outputTorque)
 end
 
+function Engine:printEngineInfo()
+    local torqueGraph = self.config["tqGraph"]
+
+    local hpInfo = {
+        peakHP = 0,
+        atRPM = 0
+    }
+    
+    local tqInfo = {
+        peakTq = 0,
+        atRPM = 0
+    }
+
+    for index, point in pairs(torqueGraph) do
+        local rpm = (index/#torqueGraph)*self.config["redline"]
+        
+        local tq = self.config["pkTorque"]*point
+        
+        local hp = tq*rpm/5252
+        
+        if tq > tqInfo.peakTq then
+            tqInfo.peakTq = tq
+            tqInfo.atRPM = rpm
+        end
+        
+        if hp > hpInfo.peakHP then
+            hpInfo.peakHP = hp
+            hpInfo.atRPM = rpm
+        end
+    end
+    
+    print(Color(150,255,255),"Engine Info:")
+    print(Color(0,255,0), math.round(hpInfo.peakHP).."hp @ "..hpInfo.atRPM.."rpm")
+    print(Color(255,150,0), math.round(tqInfo.peakTq).."ft-lb @ "..tqInfo.atRPM.."rpm")
+    
+end
 
 //Simple sound FX
 function Engine:updateSounds()
-    local rpmRatio = self.rpm/self.redline
+    local redline = self.config["redline"]
+    local pkTorque = self.config["pkTorque"]
+    local rpmRatio = self.rpm/redline
     
     //self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
-    self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/self.peakTorque)*0.5)+0.25 ) )
+    self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/pkTorque)*0.5)+0.25 ) )
     self.snd:setPitch( rpmRatio*200 )
 end
 
@@ -91,37 +128,39 @@ end
     I chose this because it allows for any number of points while still producing a nice smooth curve    
 */
 function Engine:calculateTorque(rpm)
-    if timer.curtime() < self.lastCutoff+self.powerCutoffTime then return 0 end
-
+    local powerCutOffTime = self.config["powerCutOffTime"]
+    if timer.curtime() < self.lastCutOff+powerCutOffTime then return 0 end
+    
+    local torqueGraph = self.config["tqGraph"]
     local slope1, slope2 = 0, 0
-    local rpmRatio = rpm/self.redline
-    local numberOfTorquePoints = #self.torqueGraph
+    local rpmRatio = rpm/self.config.redline
+    local numberOfTorquePoints = #torqueGraph
     local sections = numberOfTorquePoints/2
     
     local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections )
     local rpmSectionRatio = (rpmRatio*sections)%1
     
-    local torqueMin, torqueMax = self.torqueGraph[ (rpmSection*2)-1 ], self.torqueGraph[ (rpmSection*2) ]
+    local torqueMin, torqueMax = torqueGraph[ (rpmSection*2)-1 ], torqueGraph[ (rpmSection*2) ]
     
     
     if rpmSection > 1 then
-        slope1 = 0.5*(self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection-1])
+        slope1 = 0.5*(torqueGraph[rpmSection+1]-torqueGraph[rpmSection-1])
     else
-        slope2 = self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection]
+        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
     end
     
     
     if rpmSection < numberOfTorquePoints-2 then
-        slope2 = 0.5*(self.torqueGraph[rpmSection+2]-self.torqueGraph[rpmSection])
+        slope2 = 0.5*(torqueGraph[rpmSection+2]-torqueGraph[rpmSection])
     else
-        slope2 = self.torqueGraph[rpmSection+1]-self.torqueGraph[rpmSection]
+        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
     end
     
-    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.peakTorque)
+    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
     
-    if self.rpm >= self.redline then
-        self.lastCutoff = timer.curtime()
-        torque = 0
+    if self.rpm >= self.config.redline then
+        self.lastCutOff = timer.curtime()
+        //torque = 0
     end
     
     return torque 
@@ -134,60 +173,10 @@ function Engine:resetSounds()
         self.snd:setVolume(0)
 end
 
-/* Getters */
-function Engine:getEntity()
-    return self.entity
+function Engine:getTransmission()
+    return self:getComponents()[1]
 end
 
-function Engine:getActive()
-    return self.active
-end
-
-function Engine:getIdleRPM()
-    return self.idleRPM
-end
-
-function Engine:getRedline()
-    return self.redline
-end
-
-function Engine:getPeakTorque()
-    return self.peakTorque
-end
-
-function Engine:getRPM()
-    return self.rpm
-end
-
-function Engine:getOutputTorque()
-    return self.outputTorque
-end
-
-function Engine:getThrottle()
-    return self.throttle
-end
-
-/* Setters */
-function Engine:setActive(bool)
-    self.active = bool
-end
-
-function Engine:setUnloadedRPM(rpm)
-    self.unloadedRPM = rpm
-end
-
-function Engine:setLoadedRPM(rpm)
-    self.loadedRPM = rpm
-end
-
-function Engine:setRPM(rpm)
-    self.rpm = rpm
-end
-
-function Engine:setOutputTorque(torque)
-    self.outputTorque = torque
-end
-
-function Engine:setThrottle(perc)
-    self.throttle = perc
+function Engine:setThrottle(percent)
+    self.throttle = math.clamp(percent, 0, 1)
 end

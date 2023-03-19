@@ -3,127 +3,139 @@
 --@includedir simulated_engine/objects
 --@server
 
-/*
-    TODO:
-        flywheel energy transfer
-        engine, transmission, differential weight calculation
-        better rpm deceleration due to engine friction
-        transfer cases
-        add brakes to differential
-        limited slip differential
-        fuel
-        auto clutching and rev matching
-        realstic idle and redline cut off
-        engine braking
-*/
-
-/*
-    This is a very rough idea of how to simulate an engine with realistic torque and ratio values. 
-    This currently will not work with AWD vehicles. See simulated_engine/objects/wheel.txt for more info
-    
-    ALSO this does not simulate torque transfer from the flywheel to the wheels. So revving the engine up to redline and dropping the clutch will not have the desired effects of wheel spin.
-    This is because the current clutch only transfers from unloaded RPM to actual RPM. So if the wheels RPM is sitting at 0 and you drop the clutch while the Engine is at peak torque...
-    the clutch simply transfers from unloaded RPM torque to loaded RPM torque (which would be 0 because the wheels are not spinning)
-    
-    ALL TORQUE should be transmitted to the wheels in simulated_engine/objects/engine.txt via the :setInputTorque() for the transmission to maintain realistic and predictable results.
-    
-    NOTE: to ensure that this code works, place the entire simulated_engine folder into your ../data/starfall folder. Also make sure to remove the sample dupefile when placing into the data folder. 
-        Structure should look like the following:
-            .../data/starfall/simulated_engine
-    
-    NOTE: the dupe file should also go into your advduplicator data folder.
-    
-    NOTE: I've also added a sample chassis as it does utilize props for the engine, transmission, and differential. So that you can see how it works and should be set up.
-*/
-
-/*
-    The current ratios and torque values are based on a 2001 Saturn SL2 lol.
-    The torque graph for the engine is not though.
-*/
-
-wire.adjustInputs({"POD","Engine","Transmission","TransferCase","DifferentialOne","DifferentialTwo","WheelSetOne","WheelSetTwo"},{"wirelink","entity","entity","entity","entity","entity","array","array"})
-wire.adjustOutputs({"RPM","Throttle", "Torque","Gear","Clutch","TransmissionOutputTorque","DifferentialTorque"},{"number","number", "number","number","number","number","number"})
-allInputsWired = true
-
-//Check if everything is wired.
-for k, v in pairs(wire.getInputs(chip())) do
-    if wire.ports[v] == nil then allInputsWired = false return end
-    if type(wire.ports[v]) != "table" and not wire.ports[v]:isValid() then allInputsWired = false return end
-end
-
-if not allInputsWired then return end
-
 dodir("simulated_engine/objects")
-local WheelSetOne = {}
-local WheelSetTwo = {}
+wire.adjustInputs({"POD","Engine"},{"wirelink","wirelink"})
+wire.adjustOutputs({"Active","Throttle","RPM","Clutch","Gear","Brake"},{"number","number","number","number","number","number"})
+if wire.ports.POD == nil or wire.ports.Engine == nil then return end
 
-local ratios = {
-    [-1] = -3.34,
-    [0] = 0,
-    [1] = 3.23,
-    [2] = 1.950,
-    [3] = 1.32,
-    [4] = 1.02,
-    [5] = 0.95,
-    [6] = 0.9
+local ENGINE = {
+    idle        = 800,  -- rpm
+    redline     = 8000, -- rpm
+    pkTorque    = 290,  -- ft-lb
+    fwMass      = 6,    -- kgq
+    
+    powerCutOffTime = 0.075, -- seconds
+    tqGraph         = {0,0.45,0.55,0.7,1,0.9,0.8,0.7}
 }
 
-local final = 4.06
+local TRANSMISSION = {
+    ratios = {
+        [-1] = -3.34,
+        [0] = 0,
+        [1] = 3.23,
+        [2] = 1.950,
+        [3] = 1.32,
+        [4] = 1.02,
+        [5] = 0.95,
+        [6] = 0.9
+    }
+}
 
-//Create the wheel objects
-for k, v in pairs(wire.ports.WheelSetOne) do
-    local newWheel = Wheel:new(v)
-    table.insert(WheelSetOne,newWheel)
+local TRANSFERCASE = {
+    bias = 0
+}
+
+local DIFFERENTIAL = {
+    ratio = -4.06
+}
+
+local COMPONENTS = {}
+
+local function createComponents(wirelink)
+    local entity = wirelink:entity()
+    local mdl = entity:getModel()
+    local component = nil
+
+    //Engine
+    if mdl == "models/sprops/cuboids/height12/size_1/cube_12x18x12.mdl" then
+        component = Engine:new(wirelink,ENGINE)
+    end
+    
+    //Transmission    
+    if mdl == "models/sprops/cuboids/height06/size_1/cube_6x24x6.mdl" then
+        component = Transmission:new(wirelink,TRANSMISSION)
+    end
+    
+    //TransferCase
+    if mdl == "models/sprops/cuboids/height06/size_1/cube_6x18x6.mdl" then
+        component = TransferCase:new(wirelink,TRANSFERCASE)
+    end
+    
+    //Differential
+    if mdl == "models/sprops/cuboids/height06/size_1/cube_6x12x6.mdl" then
+        component = Differential:new(wirelink,DIFFERENTIAL)
+    end
+    
+    return component
 end
 
-for k, v in pairs(wire.ports.WheelSetTwo) do
-    local newWheel = Wheel:new(v)
-    table.insert(WheelSetTwo,newWheel)
+
+/*
+    Unholy abomination of control statements, loops, and inconsistent variable names for automatic component creation & linking
+    This wont be needed for addon release.
+    
+    The point for this is to automatically create the required components that are present in the drive train and link them together appropriatly for 
+        AWD, RWD, FWD configurations.
+*/
+local currentEntity = wire.ports.Engine:entity()
+local differentials = {}
+
+while( currentEntity:getClass() != "prop_physics" ) do
+    if currentEntity:getWirelink()["Entities"][1]:getClass() == "prop_physics" then break end
+    
+    local currentComponent =  createComponents(currentEntity:getWirelink())
+    table.insert(COMPONENTS, currentComponent)
+
+    
+    for index, advEntityMarker_Entity in pairs(currentEntity:getWirelink()["Entities"]) do 
+    
+        if currentEntity:getClass() != "prop_physics" then
+            
+            local wirelink = advEntityMarker_Entity:getWirelink()
+            local component = createComponents(wirelink)
+            
+            /*
+            if #COMPONENTS > 1 then
+                COMPONENTS[#COMPONENTS-1]:linkComponent(COMPONENTS[#COMPONENTS])
+                
+                print( COMPONENTS[#COMPONENTS-1], COMPONENTS[#COMPONENTS] )
+            end
+            */
+            
+            if #COMPONENTS > 1 and COMPONENTS[#COMPONENTS-1].class.name != "TransferCase" then
+                //print(COMPONENTS[#COMPONENTS-1], currentComponent)
+                COMPONENTS[#COMPONENTS-1]:linkComponent(currentComponent)
+            end
+                        
+            if component.class.name == "Differential" then
+                //table.insert(differentials,component)
+                table.insert(COMPONENTS,component)
+                
+                currentComponent:linkComponent(component)
+            end
+            
+        end
+    end
+    
+    
+    
+    currentEntity = currentEntity:getWirelink()["Entities"][#currentEntity:getWirelink()["Entities"]]
 end
-
-local pod = wire.ports.POD
-
-//Creating the objects
-local sEngine = Engine:new(wire.ports.Engine, 800, 7000, 220*1.5, 6)
-local sTransmission = Transmission:new(wire.ports.Transmission,ratios)
-local sTransferCase = TransferCase:new(wire.ports.TransferCase,0)
-local sDifferentialOne = Differential:new(wire.ports.DifferentialOne,final)
-local sDifferentialTwo = Differential:new(wire.ports.DifferentialTwo,final)
-
-sEngine:linkObject(sTransmission)
-sTransmission:linkObject(sTransferCase)
-
-sTransferCase:addDifferential(sDifferentialOne)
-sTransferCase:addDifferential(sDifferentialTwo)
-
-//sTransferCase:linkObject(sDifferentialOne)
-//sTransferCase:linkObject(sDifferentialTwo)
-
-sDifferentialOne:linkObject(WheelSetOne)
-sDifferentialTwo:linkObject(WheelSetTwo)
+table.add(COMPONENTS,differentials)
 
 
-local ECU = Controller:new(sEngine, sTransmission, sTransferCase, sDifferentialOne, sDifferentialTwo,pod)
+local sController = Controller:new(wire.ports.POD,COMPONENTS)
 
 hook.add("KeyPress","input",function(ply,key)
-    if ply != pod.Driver then return end
-    ECU:keyPress(key)
+    if ply != wire.ports.POD.Driver then return end
+    sController:keyPress(key)
 end)
 
-hook.add("KeyRelease","input",function(ply,key)
-    if ply != pod.Driver then return end
-    ECU:keyRelease(key)
+hook.add("KeyRelease","release",function(ply,key)
+    if ply != wire.ports.POD.Driver then return end
+    sController:keyRelease(key)
 end)
 
-hook.add("tick","update",function()
-    local data = ECU:think()
-    
-    wire.ports.RPM = sEngine:getRPM()
-    wire.ports.Throttle = (sEngine:getThrottle())*100
-    wire.ports.Torque = sEngine:getOutputTorque()
-    wire.ports.Gear = sTransmission:getGear()
-    wire.ports.Clutch = sTransmission:getClutch()
-    wire.ports.TransmissionOutputTorque = sTransmission:getOutputTorque()
-    wire.ports.DifferentialTorque = 0//sDifferential:getOutputTorque()
-    
+hook.add("tick","main",function()
+    sController:think()
 end)

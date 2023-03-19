@@ -5,42 +5,33 @@
 dofile("simulated_engine/objects/component.txt")
 
 Transmission = class("Transmission",Component)
-function Transmission:initialize(entity, ratios)
-    if entity == nil then error("Must attach an entity to the transmission!") return end
-    
-    self.entity = entity
-    
-    self.ratios = ratios or 
-        { 
-            [-1] = -4,
-            [0] = 0,
-            [1] = 4,
-            [2] = 3,
-            [3] = 2,
-            [4] = 1
-        }
-    
+function Transmission:initialize(wirelink, config)
+    self.wirelink = wirelink
+    self.entity = self.wirelink:entity()
+    self.config = config
+    self.components = {}
     
     self.clutch = 0
     self.gear = 0
     self.ratio = 0
     self.inputTorque = 0
     self.outputTorque = 0
-    self.gearRPM = 0
-
+    self.gearRPM = 0   
+    
     self.shiftTime = 0.25 //in seconds
     self.shiftCt = 0
     self.isChangingGears = false
 end
 
 function Transmission:think()
-    local differential = self:getLinkedObject()
+    local differential = self:getComponents()[1]
     local ct = timer.curtime()
 
-    self.ratio = self.ratios[self.gear]
+    self.ratio = self.config.ratios[self.gear]
     self.outputTorque = self.inputTorque*self.ratio*(1-self.clutch) 
     
     differential:setInputTorque(self.outputTorque)
+
     
     //This gets input RPM of the differential and multiplies it by the current ratio
     self.gearRPM = differential:getGearRPM()*math.abs(self.ratio)
@@ -104,20 +95,23 @@ function Transmission:setClutch(num)
 end
 
 function Transmission:gearUp()
-    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
-    self.gear = math.clamp(self.gear+1, minimumRatioIndex, #self.ratios)
+    local ratios = self.config.ratios
+    local minimumRatioIndex = #ratios-(table.count(ratios)-1)
+    self.gear = math.clamp(self.gear+1, minimumRatioIndex, #ratios)
     
     self.shiftCt = timer.curtime()
 
 end
 
 function Transmission:gearDown()
-    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
-    self.gear = math.clamp(self.gear-1, minimumRatioIndex, #self.ratios)
+    local ratios = self.config.ratios
+    local minimumRatioIndex = #ratios-(table.count(ratios)-1)
+    self.gear = math.clamp(self.gear-1, minimumRatioIndex, #ratios)
     self.shiftCt = timer.curtime()
 end
 
 function Transmission:setGear(num)
-    local minimumRatioIndex = #self.ratios-(table.count(self.ratios)-1)
-    self.gear = math.clamp(num, minimumRatioIndex, #self.ratios)
+    local ratios = self.config.ratios
+    local minimumRatioIndex = #ratios-(table.count(ratios)-1)
+    self.gear = math.clamp(num, minimumRatioIndex, #ratios)
 end

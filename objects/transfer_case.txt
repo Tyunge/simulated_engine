@@ -6,30 +6,27 @@ dofile("simulated_engine/objects/component.txt")
 
 
 TransferCase = class("TransferCase",Component)
-function TransferCase:initialize(entity,bias)
-    if entity == nil then error("must link an entity to the transfer case") return end
-    self.entity = entity
-    self.bias = bias or 0
+function TransferCase:initialize(wirelink,config)
+    self.wirelink = wirelink
+    self.entity = self.wirelink:entity()
+    self.config = config
+    self.components = {}
+    
     self.inputTorque = 0
     
     self.gearRPM = 0
     
     self.outputTorqueOne = 0
     self.outputTorqueTwo = 0
-    
-    self.differentials = {}
+
 end
 
 function TransferCase:think()
     
-    self.differentials[1]:setInputTorque(self.outputTorqueOne)
-    self.differentials[2]:setInputTorque(self.outputTorqueTwo)
+    self.components[1]:setInputTorque(self.outputTorqueOne)
+    self.components[2]:setInputTorque(self.outputTorqueTwo)
     
-    self.gearRPM = (self.differentials[1]:getGearRPM() + self.differentials[2]:getGearRPM())/2
-end
-
-function TransferCase:addDifferential(obj)
-    table.insert(self.differentials,obj)
+    self.gearRPM = (self.components[1]:getGearRPM() + self.components[2]:getGearRPM())/2
 end
 
 function TransferCase:setInputTorque(tq)

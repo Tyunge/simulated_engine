@@ -3,15 +3,17 @@
 --@shared
 
 Controller = class("Controller")
-function Controller:initialize(Engine, Transmission, TransferCase, DifferentialOne, DifferentialTwo, POD)
-    if Engine == nil or Transmission == nil or Differential == nil or POD == nil then error("Must link all components to controller") return end
-    
-    self.engine = Engine
-    self.transmission = Transmission
-    self.transferCase = TransferCase
-    self.differentialOne = DifferentialOne
-    self.differentialTwo = DifferentialTwo
+function Controller:initialize(POD, Components)
+    self.components = {Differentials = {}}
     self.pod = POD 
+    
+    for k, v in pairs(Components) do
+        if v.class.name != "Differential" then
+            self.components[v.class.name] = v
+        else
+            table.insert( self.components["Differentials"], v )
+        end
+    end
     
     self.data = {}
 end
@@ -19,15 +21,15 @@ end
 function Controller:keyPress(key)
     
     if key == 1 then
-        self.transmission:gearUp()
+        self.components["Transmission"]:gearUp()
     end
     
     if key == 2048 then
-        self.transmission:gearDown()
+        self.components["Transmission"]:gearDown()
     end
     
     if key == 8192 then
-        self.engine:resetSounds()
+        self.components["Engine"]:resetSounds()
     end
 end
 
@@ -35,29 +37,31 @@ function Controller:keyRelease(key)
 end
 
 function Controller:think()
-    self.engine:think()
-    self.transmission:think()
-    self.transferCase:think()
-    self.differentialOne:think()
-    self.differentialTwo:think()
-    
-    self.data[1] = self.engine:getRPM()
-    self.data[2] = self.engine:getOutputTorque()
-    self.data[3] = self.transmission:getGear()
-    self.data[4] = self.transmission:getClutch()
-    self.data[5] = self.transmission:getOutputTorque()
-    self.data[6] = 0//self.differential:getOutputTorque()
-    
-    self.differentialOne:setBrake( math.approach(self.differentialOne:getBrake(), self.pod.S, 1) )
-    self.differentialTwo:setBrake( math.approach(self.differentialOne:getBrake(), self.pod.S, 1) )
-    
-    if self.transmission:changingGears() then
-        self.engine:setThrottle(0)
-    else
-        self.engine:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
+
+    for k, v in pairs(self.components) do
+        if k == "Differentials" then
+            for j, i in pairs(v) do
+                i:think()
+            end
+        else
+            v:think()
+        end
     end
     
-    self.transmission:setClutch( math.approach( self.transmission:getClutch(), self.pod.Shift, 0.1) )
+    
+    for k, v in pairs(self.components["Differentials"]) do
+        v:setBrake( math.approach(v:getBrake(), self.pod.S, 1) )
+    end
+    
+    
+    if self.components["Transmission"]:changingGears() then
+        self.components["Engine"]:setThrottle(0)
+    else
+        self.components["Engine"]:setThrottle((self.pod.W*0.5)+self.pod.Alt*0.5)
+    end
+    
+    
+    self.components["Transmission"]:setClutch( math.approach( self.components["Transmission"]:getClutch(), self.pod.Shift, 0.1) )
     
     return self.data
 end
