@@ -18,9 +18,12 @@ function Transmission:initialize(wirelink, config)
     self.outputTorque = 0
     self.gearRPM = 0   
     
-    self.shiftTime = 0.25 //in seconds
+    self.shiftTime = 0.15 //in seconds
     self.shiftCt = 0
     self.isChangingGears = false
+    
+    /* EXPERIMENTAL */
+    self.rpm = 0
 end
 
 function Transmission:think()
@@ -29,12 +32,21 @@ function Transmission:think()
 
     self.ratio = self.config.ratios[self.gear]
     self.outputTorque = self.inputTorque*self.ratio*(1-self.clutch) 
-    
+        
+
     differential:setInputTorque(self.outputTorque)
 
     
     //This gets input RPM of the differential and multiplies it by the current ratio
     self.gearRPM = differential:getGearRPM()*math.abs(self.ratio)
+end
+
+function Transmission:inGear()
+    return math.sign( math.abs( self.gear ) ) == 1
+end
+
+function Transmission:clutchEngaged()
+    return math.floor(self.clutch) == 0
 end
 
 /* Getters */
@@ -115,3 +127,4 @@ function Transmission:setGear(num)
     local minimumRatioIndex = #ratios-(table.count(ratios)-1)
     self.gear = math.clamp(num, minimumRatioIndex, #ratios)
 end
+

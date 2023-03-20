@@ -14,15 +14,21 @@ function Engine:initialize(wirelink,config)
     
     self.fwRadius = 0.131675 -- meters
     self.fwMass = self.config.fwMass
+    self.fwTorque = 0
     self.inertia = (self.fwMass*(self.fwRadius^2))/2
     
     self.lastCutOff = timer.curtime()
     
     self.throttle = 0
-    self.rpm = 0
-    self.flywheelRPM = 0
-    self.actualRPM = 0
     
+    
+    self.rpm = 0
+    
+    self.clutchInputRPM = 0
+    self.clutchOutputRPM = 0
+    
+    self.lastCheckedTorqueDifference = 0
+     
     self.outputTorque = 0
     
     self.snd = nil
@@ -34,34 +40,57 @@ function Engine:initialize(wirelink,config)
     end
     
     self:printEngineInfo()
-    
+
 end
 
-function Engine:think()
-    self:updateSounds()
-    self.outputTorque = self:calculateTorque(self.rpm)*self.throttle
-    
-    local transmission = self:getTransmission()
-    local clutch = transmission:getClutch()
-    
-    local inNuetral = math.sign( math.abs(transmission:getGear()) )
-    local inNuetralOrClutched = math.clamp( math.sign(clutch) + (1-inNuetral), 0, 1)
-    
-    
-    local engineAcceleration = math.rad(self.outputTorque/self.inertia)
-    local flyWheelTorque = (( self.rpm* 0.1047198 )/self.fwMass)*(1-math.sign(self.outputTorque))
-    
-    self.flywheelRPM = ( ( self.flywheelRPM + (engineAcceleration - flyWheelTorque) )*inNuetralOrClutched ) + ( self.actualRPM*(1-inNuetralOrClutched) )
-    self.flywheelRPM = math.clamp( self.flywheelRPM, self.config.idle, self.config.redline)
-    
-    
-    local factor = math.clamp(clutch+(1-inNuetral), 0, 1)
-    self.rpm = (self.flywheelRPM*factor) + self.actualRPM*(1-factor)
-    self.rpm = math.clamp(self.rpm,self.config.idle, self.config.redline)
 
-    self.actualRPM = transmission:getGearRPM()
+function Engine:think()
+    local transmission = self:getTransmission()
+ 
+    
+    if not transmission:clutchEngaged() or not transmission:inGear() then
+        //Engine is not connected to transmission
         
+        //Clutch Input RPM
+        local engineAcceleration = math.rad( self.outputTorque/(self.inertia/2) )
+        local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
+        
+        self.clutchInputRPM = self.clutchInputRPM+(engineAcceleration-engineDeceleration)
+        self.clutchInputRPM = math.max( self.config["idle"], self.clutchInputRPM )    
+        
+        
+        self.outputTorque = self:calculateTorque(self.clutchInputRPM)
+        
+    else
+
+            
+        local rpmDifference = self.clutchInputRPM - self.clutchOutputRPM
+        local torqueDifference = self:calculateTorque( math.abs(rpmDifference) )*math.sign(rpmDifference)
+            
+            
+        local deltaTorqueDifference = torqueDifference - self.lastCheckedTorqueDifference
+        self.lastCheckedTorqueDifference = torqueDifference
+
+        local inputRPMAcceleration = math.rad( (torqueDifference-deltaTorqueDifference) /self.inertia )
+            
+            
+        local factor = (rpmDifference/self.clutchInputRPM)
+
+        
+        self.clutchInputRPM = (self.clutchInputRPM*factor)+(self.clutchOutputRPM*(1-factor))
+        self.outputTorque = self:calculateTorque(self.clutchInputRPM)
+        
+    end
+        
+    
     transmission:setInputTorque(self.outputTorque)
+
+    //Clutch OutputRPM 
+    self.clutchOutputRPM = transmission:getGearRPM()   
+    self.rpm = math.min( self.config["redline"], self.clutchInputRPM)
+    self:updateSounds()
+
+    
 end
 
 function Engine:printEngineInfo()
@@ -109,7 +138,7 @@ function Engine:updateSounds()
     
     //self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
     self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/pkTorque)*0.5)+0.25 ) )
-    self.snd:setPitch( rpmRatio*200 )
+    self.snd:setPitch( rpmRatio*200, 0.1 )
 end
 
 /*
@@ -156,7 +185,7 @@ function Engine:calculateTorque(rpm)
         slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
     end
     
-    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
+    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque*self.throttle)
     
     if self.rpm >= self.config.redline then
         self.lastCutOff = timer.curtime()
