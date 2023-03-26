@@ -63,17 +63,15 @@ function Engine:think()
         self.outputTorque = self:calculateTorque(self.clutchInputRPM)*self.throttle
         
     else
-        local flywheelAverageRPM = (self.clutchInputRPM + self.clutchOutputRPM)/2
-        local rpmDifference = self.clutchInputRPM - self.clutchOutputRPM
+        local rpmDifference = (self.clutchInputRPM - self.clutchOutputRPM)/(self.inertia*10)
         
         local differenceTorque = self.inertia*rpmDifference
-
+        
         
         local engineOutputTorque = self:calculateTorque( self.clutchInputRPM )*self.throttle
         
-        
         self.outputTorque = math.max(engineOutputTorque,differenceTorque)
-        self.clutchInputRPM = self.clutchInputRPM - math.rad( differenceTorque )/self.inertia
+        self.clutchInputRPM = self.clutchInputRPM - math.rad(differenceTorque)/self.inertia
     end
         
     

@@ -98,7 +98,7 @@ function Transmission:setClutch(num)
     
     if ct < self.shiftCt+self.shiftTime then
         self.isChangingGears = true
-        self.clutch = 1
+        //self.clutch = 1
     else
         self.clutch = math.clamp(num,0,1)
         self.isChangingGears = false
