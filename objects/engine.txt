@@ -27,7 +27,7 @@ function Engine:initialize(wirelink,config)
     self.clutchInputRPM = 0
     self.clutchOutputRPM = 0
     
-    self.lastCheckedTorqueDifference = 0
+    self.lastCheckedRPM = 0
      
     self.outputTorque = 0
     
@@ -46,47 +46,40 @@ end
 
 function Engine:think()
     local transmission = self:getTransmission()
- 
-    
+    self.clutchOutputRPM = transmission:getGearRPM()   
+
     if not transmission:clutchEngaged() or not transmission:inGear() then
         //Engine is not connected to transmission
         
         //Clutch Input RPM
-        local engineAcceleration = math.rad( self.outputTorque/(self.inertia/2) )
+        local engineAcceleration = math.rad( self.outputTorque/self.inertia )
         local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
+    
         
         self.clutchInputRPM = self.clutchInputRPM+(engineAcceleration-engineDeceleration)
         self.clutchInputRPM = math.max( self.config["idle"], self.clutchInputRPM )    
         
         
-        self.outputTorque = self:calculateTorque(self.clutchInputRPM)
+        self.outputTorque = self:calculateTorque(self.clutchInputRPM)*self.throttle
         
     else
-
-            
+        local flywheelAverageRPM = (self.clutchInputRPM + self.clutchOutputRPM)/2
         local rpmDifference = self.clutchInputRPM - self.clutchOutputRPM
-        local torqueDifference = self:calculateTorque( math.abs(rpmDifference) )*math.sign(rpmDifference)
-            
-            
-        local deltaTorqueDifference = torqueDifference - self.lastCheckedTorqueDifference
-        self.lastCheckedTorqueDifference = torqueDifference
-
-        local inputRPMAcceleration = math.rad( (torqueDifference-deltaTorqueDifference) /self.inertia )
-            
-            
-        local factor = (rpmDifference/self.clutchInputRPM)
-
         
-        self.clutchInputRPM = (self.clutchInputRPM*factor)+(self.clutchOutputRPM*(1-factor))
-        self.outputTorque = self:calculateTorque(self.clutchInputRPM)
+        local differenceTorque = self:calculateTorque( math.abs(rpmDifference) )*math.sign(rpmDifference)
+        local engineOutputTorque = self:calculateTorque( self.clutchInputRPM )*self.throttle
         
+        self.outputTorque = math.max(engineOutputTorque,differenceTorque)
+        
+        self.clutchInputRPM = self.clutchInputRPM - math.rad( differenceTorque )/self.inertia
     end
         
     
     transmission:setInputTorque(self.outputTorque)
 
+    self.clutchInputRPM = math.clamp(self.clutchInputRPM, 0, self.config["redline"])
+    
     //Clutch OutputRPM 
-    self.clutchOutputRPM = transmission:getGearRPM()   
     self.rpm = math.min( self.config["redline"], self.clutchInputRPM)
     self:updateSounds()
 
@@ -138,7 +131,7 @@ function Engine:updateSounds()
     
     //self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
     self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/pkTorque)*0.5)+0.25 ) )
-    self.snd:setPitch( rpmRatio*200, 0.1 )
+    self.snd:setPitch( rpmRatio*200 )
 end
 
 /*
@@ -185,7 +178,7 @@ function Engine:calculateTorque(rpm)
         slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
     end
     
-    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque*self.throttle)
+    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
     
     if self.rpm >= self.config.redline then
         self.lastCutOff = timer.curtime()
@@ -208,4 +201,12 @@ end
 
 function Engine:setThrottle(percent)
     self.throttle = math.clamp(percent, 0, 1)
+end
+
+function Engine:getThrottle()
+    return self.throttle
+end
+
+function Engine:getRPM()
+    return self.clutchInputRPM
 end

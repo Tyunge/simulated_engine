@@ -55,7 +55,11 @@ function Differential:think()
         
         local axis = wh:getEntity():localToWorld(Vector(0,1,0))-wh:getEntity():getPos()//wh:getEntity():worldToLocal(Vector(0,1,0)+wh:getPos())
         
-        wh:applyTorque( math.sign(angleVelocity)*axis*self.brakePower ) 
+        
+        if self.brake > 0 then
+            wh:getEntity():setAngleVelocity( Vector(0,wh:getEntity():getAngleVelocity().y/10,0) )
+        end
+        //wh:applyTorque( math.sign(angleVelocity)*axis*self.brakePower ) 
         
         wh:applyTorque( self.entity:getForward()*self.outputTorque)
    

@@ -53,15 +53,22 @@ function Controller:think()
         v:setBrake( math.approach(v:getBrake(), self.pod.S, 1) )
     end
     
-    
+
     if self.components["Transmission"]:changingGears() then
         self.components["Engine"]:setThrottle(0)
     else
         self.components["Engine"]:setThrottle((self.pod.W*0.75)+self.pod.Alt*0.25)
     end
 
-    //self.components["Transmission"]:setClutch( math.approach( self.components["Transmission"]:getClutch(), self.pod.Shift, 0.1) )
-    self.components["Transmission"]:setClutch( self.pod.Shift )
+    self.components["Transmission"]:setClutch( math.sign( self.pod.Shift + self.pod.S ) )
+
+
+    self.data = {
+        ["RPM"] = self.components["Engine"]:getRPM(),
+        ["Throttle"] = self.components["Engine"]:getThrottle(),
+        ["Clutch"]  = self.components["Transmission"]:getClutch()
+    }
+    
     
     return self.data
 end

@@ -11,11 +11,11 @@ if wire.ports.POD == nil or wire.ports.Engine == nil then return end
 local ENGINE = {
     idle        = 800,  -- rpm
     redline     = 8000, -- rpm
-    pkTorque    = 450,  -- ft-lb
+    pkTorque    = 290,  -- ft-lb
     fwMass      = 5,    -- kg
     
-    powerCutOffTime = 0.1, -- seconds
-    tqGraph         = {0.4,0.45,0.55,0.7,1,0.9,0.8,0.7}
+    powerCutOffTime = 0.05, -- seconds
+    tqGraph         = {0,0.45,0.55,0.7,1,0.9,0.8,0.7}
 }
 
 local TRANSMISSION = {
@@ -137,5 +137,12 @@ hook.add("KeyRelease","release",function(ply,key)
 end)
 
 hook.add("tick","main",function()
-    sController:think()
+    local data = sController:think()
+    
+    
+    wire.ports.RPM = data["RPM"]
+    wire.ports.Clutch = data["Clutch"]
+    wire.ports.Throttle = data["Throttle"]
+    
+    
 end)
