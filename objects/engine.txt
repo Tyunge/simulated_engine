@@ -26,8 +26,11 @@ function Engine:initialize(wirelink,config)
     
     self.lastCutOff = timer.curtime()
     
-    self.throttle = 0
+    self.active = false
     
+    self.throttle = 0
+    self.idleThrottle = 0
+    self.totalThrottle = 0
     
     self.rpm = 0
     
@@ -64,29 +67,121 @@ function Engine:think()
     
     local engineAcceleration = math.rad( self.outputTorque/self.inertia )
     local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
+
+    if self.active then
+        
+        if engineUnderLoad == 0 then
+            
+            if self.clutchInputRPM < self.config["idle"]/2 then
+                self.clutchInputRPM = self.clutchInputRPM+25
+            end
+            
+            self.idleThrottle = math.clamp( (1-(self.clutchInputRPM/self.config["idle"]))*2 , 0, 1 )
+            
+        end
+        
+    else
+        self.idleThrottle = 0
+        self.clutchInputRPM = math.approach(self.clutchInputRPM, 0, engineDeceleration)
+    end
     
-    local engineNoLoadAcceleration = (engineAcceleration-engineDeceleration)*(1-engineUnderLoad)
+    self.totalThrottle = math.clamp( self.idleThrottle+self.throttle, 0, 1 )
+
+    //local engineNoLoadAcceleration = (engineAcceleration-engineDeceleration)*(1-engineUnderLoad)
+    local engineNoLoadAcceleration = ( engineAcceleration - engineDeceleration*(1-math.sign(self.throttle)) )*(1-engineUnderLoad)
     
-    local rpmDifference = (self.clutchInputRPM - self.clutchOutputRPM)/self.inertia
+    local rpmDifference = (math.min(self.clutchInputRPM, self.config["redline"]) - self.clutchOutputRPM)/self.inertia
+    
     local torqueDifference = self.inertia*rpmToRads(rpmDifference)
     
-    local engineLoadedAcceleration = -(math.rad(torqueDifference)/self.inertia)*engineUnderLoad
-    
+    local engineLoadedAcceleration = ( (math.rad(torqueDifference)/self.inertia)*engineUnderLoad )*-1
     
     self.clutchInputRPM = self.clutchInputRPM + (engineNoLoadAcceleration+engineLoadedAcceleration)
-    self.clutchInputRPM = math.clamp( self.clutchInputRPM , self.config["idle"], self.config["redline"] )
+    //self.clutchInputRPM = math.clamp(self.clutchInputRPM, 0, self.config["redline"])
     
+    self.outputTorque = math.max( self:calculateTorque(self.clutchInputRPM)*self.totalThrottle, torqueDifference*engineUnderLoad )
     
-    self.outputTorque = math.max( self:calculateTorque(self.clutchInputRPM)*self.throttle, torqueDifference*engineUnderLoad )
-    
+    if not self.active then
+        self.outputTorque = 0
+    end
     
     transmission:setInputTorque(self.outputTorque)
-    
+
     //Clutch OutputRPM 
     self.rpm = math.min( self.config["redline"], self.clutchInputRPM)
     self:updateSounds()
 
     
+end
+
+
+//Simple sound FX
+function Engine:updateSounds()
+    local redline = self.config["redline"]
+    local pkTorque = self.config["pkTorque"]
+    local rpmRatio = self.rpm/redline
+    
+    //self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
+    self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/pkTorque)*0.5)+0.25 ) )
+    self.snd:setPitch( rpmRatio*200 )
+end
+
+/*
+    Torque Curve calculation
+    
+    https://en.wikipedia.org/wiki/Cubic_Hermite_spline
+    
+    This is using a Hermite Curve interpolation to generate a torque curve.
+    This works by splitting the rpm range from idle => redline into sections. 
+    The number of section are the number of points in the torque graph divided in half
+    Ex. 
+        if you have 8 numbers in the torqueGraph table then the number of torque sections in the rpm range is 4.
+    
+    You can have as many points in the torque graph as long as it's an even number
+    
+    I chose this because it allows for any number of points while still producing a nice smooth curve    
+*/
+function Engine:calculateTorque(rpm)
+    local powerCutOffTime = self.config["powerCutOffTime"]
+    if timer.curtime() < self.lastCutOff+powerCutOffTime then 
+        self.clutchInputRPM = self.clutchInputRPM - ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
+        return 0 
+    end
+    
+    local torqueGraph = self.config["tqGraph"]
+    local slope1, slope2 = 0, 0
+    local rpmRatio = rpm/self.config.redline
+    local numberOfTorquePoints = #torqueGraph
+    local sections = numberOfTorquePoints/2
+    
+    local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections )
+    local rpmSectionRatio = (rpmRatio*sections)%1
+    
+    local torqueMin, torqueMax = torqueGraph[ (rpmSection*2)-1 ], torqueGraph[ (rpmSection*2) ]
+    
+    
+    if rpmSection > 1 then
+        slope1 = 0.5*(torqueGraph[rpmSection+1]-torqueGraph[rpmSection-1])
+    else
+        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
+    end
+    
+    
+    if rpmSection < numberOfTorquePoints-2 then
+        slope2 = 0.5*(torqueGraph[rpmSection+2]-torqueGraph[rpmSection])
+    else
+        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
+    end
+    
+    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
+    
+    
+    if self.rpm >= self.config["redline"] then
+        self.lastCutOff = timer.curtime()
+        torque = 0
+    end
+    
+    return torque 
 end
 
 function Engine:printEngineInfo()
@@ -126,71 +221,6 @@ function Engine:printEngineInfo()
     
 end
 
-//Simple sound FX
-function Engine:updateSounds()
-    local redline = self.config["redline"]
-    local pkTorque = self.config["pkTorque"]
-    local rpmRatio = self.rpm/redline
-    
-    //self.snd:setVolume( math.clamp(rpmRatio,0.1, (self.throttle*0.5)+0.25 ) )
-    self.snd:setVolume( math.clamp( rpmRatio, 0.1, ((self.outputTorque/pkTorque)*0.5)+0.25 ) )
-    self.snd:setPitch( rpmRatio*200 )
-end
-
-/*
-    Torque Curve calculation
-    
-    https://en.wikipedia.org/wiki/Cubic_Hermite_spline
-    
-    This is using a Hermite Curve interpolation to generate a torque curve.
-    This works by splitting the rpm range from idle => redline into sections. 
-    The number of section are the number of points in the torque graph divided in half
-    Ex. 
-        if you have 8 numbers in the torqueGraph table then the number of torque sections in the rpm range is 4.
-    
-    You can have as many points in the torque graph as long as it's an even number
-    
-    I chose this because it allows for any number of points while still producing a nice smooth curve    
-*/
-function Engine:calculateTorque(rpm)
-    local powerCutOffTime = self.config["powerCutOffTime"]
-    if timer.curtime() < self.lastCutOff+powerCutOffTime then return 0 end
-    
-    local torqueGraph = self.config["tqGraph"]
-    local slope1, slope2 = 0, 0
-    local rpmRatio = rpm/self.config.redline
-    local numberOfTorquePoints = #torqueGraph
-    local sections = numberOfTorquePoints/2
-    
-    local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections )
-    local rpmSectionRatio = (rpmRatio*sections)%1
-    
-    local torqueMin, torqueMax = torqueGraph[ (rpmSection*2)-1 ], torqueGraph[ (rpmSection*2) ]
-    
-    
-    if rpmSection > 1 then
-        slope1 = 0.5*(torqueGraph[rpmSection+1]-torqueGraph[rpmSection-1])
-    else
-        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
-    end
-    
-    
-    if rpmSection < numberOfTorquePoints-2 then
-        slope2 = 0.5*(torqueGraph[rpmSection+2]-torqueGraph[rpmSection])
-    else
-        slope2 = torqueGraph[rpmSection+1]-torqueGraph[rpmSection]
-    end
-    
-    local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
-    
-    if self.rpm >= self.config.redline then
-        self.lastCutOff = timer.curtime()
-        //torque = 0
-    end
-    
-    return torque 
-end
-
 function Engine:resetSounds()
     self.snd:destroy()
     self.snd = sound.create(self.entity,"acf_base/engines/i5_petrolsmall.wav")
@@ -212,4 +242,8 @@ end
 
 function Engine:getRPM()
     return self.clutchInputRPM
+end
+
+function Engine:toggleActive()
+    self.active = not self.active
 end

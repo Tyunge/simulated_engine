@@ -29,8 +29,11 @@ function Controller:keyPress(key)
     end
     
     if key == 8192 then
+        //R
         self.components["Engine"]:resetSounds()
+        self.components["Engine"]:toggleActive()
     end
+
 end
 
 function Controller:keyRelease(key)
@@ -60,7 +63,7 @@ function Controller:think()
         self.components["Engine"]:setThrottle((self.pod.W*0.75)+self.pod.Alt*0.25)
     end
 
-    self.components["Transmission"]:setClutch( math.approach( self.components["Transmission"]:getClutch(), self.pod.Shift*0.75, 0.25 ) )
+    self.components["Transmission"]:setClutch( math.approach( self.components["Transmission"]:getClutch(), self.pod.Shift, 0.25 ) )
 
 
     self.data = {
