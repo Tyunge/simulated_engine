@@ -4,6 +4,13 @@
 --@server
 dofile("simulated_engine/objects/component.txt")
 
+local function rpmToRads(rpm)
+    //Convert RPM to radians/sec
+    return rpm*0.1047198
+end
+
+
+
 Engine = class("Engine",Component)
 function Engine:initialize(wirelink,config)
     self.wirelink = wirelink
@@ -47,37 +54,33 @@ end
 function Engine:think()
     local transmission = self:getTransmission()
     self.clutchOutputRPM = transmission:getGearRPM()   
-
-    if not transmission:clutchEngaged() or not transmission:inGear() then
-        //Engine is not connected to transmission
-        
-        //Clutch Input RPM
-        local engineAcceleration = math.rad( self.outputTorque/self.inertia )
-        local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
     
-        
-        self.clutchInputRPM = self.clutchInputRPM+(engineAcceleration-engineDeceleration)
-        self.clutchInputRPM = math.max( self.config["idle"], self.clutchInputRPM )    
-        
-        
-        self.outputTorque = self:calculateTorque(self.clutchInputRPM)*self.throttle
-        
-    else
-        local rpmDifference = (self.clutchInputRPM - self.clutchOutputRPM)/(self.inertia*10)
-        
-        local differenceTorque = self.inertia*rpmDifference
-        
-        
-        local engineOutputTorque = self:calculateTorque( self.clutchInputRPM )*self.throttle
-        
-        self.outputTorque = math.max(engineOutputTorque,differenceTorque)
-        self.clutchInputRPM = self.clutchInputRPM - math.rad(differenceTorque)/self.inertia
+    local engineUnderLoad = 0
+    
+    if transmission:inGear() then
+        engineUnderLoad = 1-transmission:getClutch()
     end
-        
+
+    
+    local engineAcceleration = math.rad( self.outputTorque/self.inertia )
+    local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
+    
+    local engineNoLoadAcceleration = (engineAcceleration-engineDeceleration)*(1-engineUnderLoad)
+    
+    local rpmDifference = (self.clutchInputRPM - self.clutchOutputRPM)/self.inertia
+    local torqueDifference = self.inertia*rpmToRads(rpmDifference)
+    
+    local engineLoadedAcceleration = -(math.rad(torqueDifference)/self.inertia)*engineUnderLoad
+    
+    
+    self.clutchInputRPM = self.clutchInputRPM + (engineNoLoadAcceleration+engineLoadedAcceleration)
+    self.clutchInputRPM = math.clamp( self.clutchInputRPM , self.config["idle"], self.config["redline"] )
+    
+    
+    self.outputTorque = math.max( self:calculateTorque(self.clutchInputRPM)*self.throttle, torqueDifference*engineUnderLoad )
+    
     
     transmission:setInputTorque(self.outputTorque)
-
-    self.clutchInputRPM = math.clamp(self.clutchInputRPM, 0, self.config["redline"])
     
     //Clutch OutputRPM 
     self.rpm = math.min( self.config["redline"], self.clutchInputRPM)

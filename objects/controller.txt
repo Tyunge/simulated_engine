@@ -60,7 +60,7 @@ function Controller:think()
         self.components["Engine"]:setThrottle((self.pod.W*0.75)+self.pod.Alt*0.25)
     end
 
-    self.components["Transmission"]:setClutch( math.sign( self.pod.Shift + self.pod.S ) )
+    self.components["Transmission"]:setClutch( math.approach( self.components["Transmission"]:getClutch(), self.pod.Shift*0.75, 0.25 ) )
 
 
     self.data = {

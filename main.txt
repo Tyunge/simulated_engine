@@ -12,7 +12,7 @@ local ENGINE = {
     idle        = 800,  -- rpm
     redline     = 8000, -- rpm
     pkTorque    = 290,  -- ft-lb
-    fwMass      = 4,    -- kg
+    fwMass      = 5,    -- kg
     
     powerCutOffTime = 0.05, -- seconds
     tqGraph         = {0,0.45,0.55,0.7,1,0.9,0.8,0.7}
