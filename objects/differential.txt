@@ -57,7 +57,7 @@ function Differential:think()
         
         
         if self.brake > 0 then
-            wh:getEntity():setAngleVelocity( Vector(0,wh:getEntity():getAngleVelocity().y/10,0) )
+            wh:getEntity():setAngleVelocity( Vector(0,wh:getEntity():getAngleVelocity().y/1.05,0) )
         end
         //wh:applyTorque( math.sign(angleVelocity)*axis*self.brakePower ) 
         
