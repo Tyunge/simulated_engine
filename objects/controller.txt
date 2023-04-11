@@ -69,7 +69,8 @@ function Controller:think()
     self.data = {
         ["RPM"] = self.components["Engine"]:getRPM(),
         ["Throttle"] = self.components["Engine"]:getThrottle(),
-        ["Clutch"]  = self.components["Transmission"]:getClutch()
+        ["Clutch"]  = self.components["Transmission"]:getClutch(),
+        ["EngineTorque"] = self.components["Engine"]:getTorque()
     }
     
     

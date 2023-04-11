@@ -148,16 +148,18 @@ function Engine:calculateTorque(rpm)
         return 0 
     end
     
+    
     local torqueGraph = self.config["tqGraph"]
     local slope1, slope2 = 0, 0
     local rpmRatio = rpm/self.config.redline
     local numberOfTorquePoints = #torqueGraph
-    local sections = numberOfTorquePoints/2
+    local sections = numberOfTorquePoints
     
-    local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections )
+    local rpmSection = math.clamp( math.floor(rpmRatio*sections)+1, 1, sections-1 )
     local rpmSectionRatio = (rpmRatio*sections)%1
     
-    local torqueMin, torqueMax = torqueGraph[ (rpmSection*2)-1 ], torqueGraph[ (rpmSection*2) ]
+    local torqueMin = torqueGraph[ rpmSection ]
+    local torqueMax = torqueGraph[ rpmSection+1 ]
     
     
     if rpmSection > 1 then
@@ -174,8 +176,8 @@ function Engine:calculateTorque(rpm)
     end
     
     local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
-    
-    
+
+
     if self.rpm >= self.config["redline"] then
         self.lastCutOff = timer.curtime()
         torque = 0
@@ -242,6 +244,10 @@ end
 
 function Engine:getRPM()
     return self.clutchInputRPM
+end
+
+function Engine:getTorque()
+    return self.outputTorque
 end
 
 function Engine:toggleActive()

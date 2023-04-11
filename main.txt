@@ -5,29 +5,28 @@
 
 dodir("simulated_engine/objects")
 wire.adjustInputs({"POD","Engine"},{"wirelink","wirelink"})
-wire.adjustOutputs({"Active","Throttle","RPM","Clutch","Gear","Brake"},{"number","number","number","number","number","number"})
+wire.adjustOutputs({"Active","Throttle","RPM","Clutch","Gear","Brake","EngineTorque"},{"number","number","number","number","number","number","number"})
 if wire.ports.POD == nil or wire.ports.Engine == nil then return end
 
 local ENGINE = {
     idle        = 800,  -- rpm
     redline     = 8000, -- rpm
-    pkTorque    = 290,  -- ft-lb
-    fwMass      = 4,    -- kg
+    pkTorque    = 102,  -- ft-lb
+    fwMass      = 2.5,    -- kg
     
     powerCutOffTime = 0.05, -- seconds
-    tqGraph         = {0,0.45,0.55,0.7,1,0.9,0.8,0.7}
+    tqGraph         = {0,0.26,0.39,0.52,0.65,0.82,0.8,0.81,0.94,0.95,1,0.93,0.86,0.78,0.62,0.47} //0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8
 }
+
 
 local TRANSMISSION = {
     ratios = {
         [-1] = -3.34,
         [0] = 0,
-        [1] = 3.23,
-        [2] = 1.950,
-        [3] = 1.32,
-        [4] = 1.02,
-        [5] = 0.95,
-        [6] = 0.9
+        [1] = 4.43,
+        [2] = 3.3,
+        [3] = 2.5,
+        [4] = 2.02
     }
 }
 
@@ -36,7 +35,7 @@ local TRANSFERCASE = {
 }
 
 local DIFFERENTIAL = {
-    ratio = -4.06
+    ratio = 3
 }
 
 local COMPONENTS = {}
@@ -143,6 +142,6 @@ hook.add("tick","main",function()
     wire.ports.RPM = data["RPM"]
     wire.ports.Clutch = data["Clutch"]
     wire.ports.Throttle = data["Throttle"]
-    
+    wire.ports.EngineTorque = data["EngineTorque"]
     
 end)
