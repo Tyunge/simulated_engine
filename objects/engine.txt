@@ -24,7 +24,7 @@ function Engine:initialize(wirelink,config)
     self.fwTorque = 0
     self.inertia = (self.fwMass*(self.fwRadius^2))/2
     
-    self.lastCutOff = timer.curtime()
+    self.lastCutOff = 0//timer.curtime()
     
     self.active = false
     
@@ -198,28 +198,40 @@ function Engine:printEngineInfo()
         peakTq = 0,
         atRPM = 0
     }
-
+    
     for index, point in pairs(torqueGraph) do
-        local rpm = (index/#torqueGraph)*self.config["redline"]
+        local minRPM = ((index-1)/#torqueGraph)*self.config["redline"]
+        local maxRPM = (index/#torqueGraph)*self.config["redline"]
         
-        local tq = self.config["pkTorque"]*point
+        local difference = maxRPM-minRPM
         
-        local hp = tq*rpm/5252
-        
-        if tq > tqInfo.peakTq then
-            tqInfo.peakTq = tq
-            tqInfo.atRPM = rpm
+        for sample = 0, 15, 1 do
+            local rpm = minRPM + (sample/15)*difference
+            local tq = self:calculateTorque(rpm)
+            
+            local hp = tq*rpm/5252
+            
+            if tq > tqInfo.peakTq then
+                tqInfo.peakTq = math.round(tq)
+                tqInfo.atRPM = math.round(rpm)
+            end
+            
+            if hp > hpInfo.peakHP then
+                hpInfo.peakHP = math.round(hp)
+                hpInfo.atRPM = math.round(rpm)
+            end
+            
+            if rpm == self.config["redline"] then
+                print(Color(150,255,255),"Engine Info:")
+                print(Color(0,255,0), math.round(hpInfo.peakHP).."hp @ "..hpInfo.atRPM.."rpm")
+                print(Color(255,150,0), math.round(tqInfo.peakTq).."ft-lb @ "..tqInfo.atRPM.."rpm")
+            end
+            
         end
         
-        if hp > hpInfo.peakHP then
-            hpInfo.peakHP = hp
-            hpInfo.atRPM = rpm
-        end
     end
     
-    print(Color(150,255,255),"Engine Info:")
-    print(Color(0,255,0), math.round(hpInfo.peakHP).."hp @ "..hpInfo.atRPM.."rpm")
-    print(Color(255,150,0), math.round(tqInfo.peakTq).."ft-lb @ "..tqInfo.atRPM.."rpm")
+
     
 end
 
