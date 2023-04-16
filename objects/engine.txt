@@ -9,7 +9,13 @@ local function rpmToRads(rpm)
     return rpm*0.1047198
 end
 
+local function accelerationToRPM(acceleration)
+    return acceleration/60
+end
 
+local function ftlbToNM(ftlb)
+    return ftlb*2.7116358966
+end
 
 Engine = class("Engine",Component)
 function Engine:initialize(wirelink,config)
@@ -58,60 +64,56 @@ function Engine:think()
     local transmission = self:getTransmission()
     self.clutchOutputRPM = transmission:getGearRPM()   
     
-    local engineUnderLoad = 0
-    
+    local engineLoadFactor = 0
     if transmission:inGear() then
-        engineUnderLoad = 1-transmission:getClutch()
+        engineLoadFactor = 1-(transmission:getClutch())
     end
 
     
-    local engineAcceleration = math.rad( self.outputTorque/self.inertia )
-    local engineDeceleration = ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
-
     if self.active then
+        self.totalThrottle = math.clamp(self.idleThrottle+self.throttle, 0, 1)
         
-        if engineUnderLoad == 0 then
-            
-            if self.clutchInputRPM < self.config["idle"]/2 then
-                self.clutchInputRPM = self.clutchInputRPM+25
-            end
-            
-            self.idleThrottle = math.clamp( (1-(self.clutchInputRPM/self.config["idle"]))*2 , 0, 1 )
-            
+        
+        if self.clutchInputRPM < self.config["idle"]/2 then
+            //Pseudo starter
+            self.clutchInputRPM = math.approach(self.clutchInputRPM, self.config["idle"]/2, 25)
         end
         
+        //Idle Controller
+        if self.clutchInputRPM < self.config["idle"] then
+            self.idleThrottle = self.clutchInputRPM/self.config["idle"]
+        else
+            self.idleThrottle = 0
+        end
+        
+        //Coefficient should change per engine type
+        local frictionCoefficient = (self.config["pkTorque"]*self.config["tqGraph"][2]*0.75)
+        
+        local frictionFactor = (self.clutchInputRPM/self.config["redline"])*frictionCoefficient
+        local engineAcceleration = accelerationToRPM(ftlbToNM(self.outputTorque)/self.inertia)
+        local engineDeceleration = accelerationToRPM(ftlbToNM(frictionFactor)/self.inertia)
+        
+        local totalUnloadedAcceleration = engineAcceleration-engineDeceleration
+        
+        
+        local rpmDifference = self.clutchInputRPM - self.clutchOutputRPM
+        local torqueDifference = self:calculateTorque( math.abs(rpmDifference) )*math.sign(rpmDifference)
+        local accelerationDifference = accelerationToRPM( (ftlbToNM(torqueDifference)/self.inertia) )
+        
+        local finalEngineAcceleration = (totalUnloadedAcceleration*(1-engineLoadFactor)) + (-accelerationDifference*engineLoadFactor)
+        self.clutchInputRPM = math.clamp( self.clutchInputRPM + finalEngineAcceleration, 0, self.config["redline"] )
+        
+        self.outputTorque = math.max( self:calculateTorque(self.clutchInputRPM)*self.totalThrottle, torqueDifference*engineLoadFactor )
+
+        
     else
-        self.idleThrottle = 0
-        self.clutchInputRPM = math.approach(self.clutchInputRPM, 0, engineDeceleration)
+    
     end
     
-    self.totalThrottle = math.clamp( self.idleThrottle+self.throttle, 0, 1 )
-
-    //local engineNoLoadAcceleration = (engineAcceleration-engineDeceleration)*(1-engineUnderLoad)
-    local engineNoLoadAcceleration = ( engineAcceleration - engineDeceleration*(1-math.sign(self.throttle)) )*(1-engineUnderLoad)
-    
-    local rpmDifference = (math.min(self.clutchInputRPM, self.config["redline"]) - self.clutchOutputRPM)/self.inertia
-    
-    local torqueDifference = self.inertia*rpmToRads(rpmDifference)
-    
-    local engineLoadedAcceleration = ( (math.rad(torqueDifference)/self.inertia)*engineUnderLoad )*-1
-    
-    self.clutchInputRPM = self.clutchInputRPM + (engineNoLoadAcceleration+engineLoadedAcceleration)
-    //self.clutchInputRPM = math.clamp(self.clutchInputRPM, 0, self.config["redline"])
-    
-    self.outputTorque = math.max( self:calculateTorque(self.clutchInputRPM)*self.totalThrottle, torqueDifference*engineUnderLoad )
-    
-    if not self.active then
-        self.outputTorque = 0
-    end
-    
+    self.rpm = self.clutchInputRPM
     transmission:setInputTorque(self.outputTorque)
-
-    //Clutch OutputRPM 
-    self.rpm = math.min( self.config["redline"], self.clutchInputRPM)
     self:updateSounds()
 
-    
 end
 
 
@@ -144,7 +146,6 @@ end
 function Engine:calculateTorque(rpm)
     local powerCutOffTime = self.config["powerCutOffTime"]
     if timer.curtime() < self.lastCutOff+powerCutOffTime then 
-        self.clutchInputRPM = self.clutchInputRPM - ((self.clutchInputRPM*self.fwRadius)/self.fwMass)*(1-math.sign(self.outputTorque))
         return 0 
     end
     
@@ -178,7 +179,7 @@ function Engine:calculateTorque(rpm)
     local torque = ( (2*(rpmSectionRatio^3)-3*(rpmSectionRatio^2)+1)*torqueMin + ( (rpmSectionRatio^3)-2*(rpmSectionRatio^2)+rpmSectionRatio )*slope1 + ( -2*(rpmSectionRatio^3)+3*(rpmSectionRatio^2) )*torqueMax + ( (rpmSectionRatio^3)-(rpmSectionRatio^2) )*slope2 )*(self.config.pkTorque)
 
 
-    if self.rpm >= self.config["redline"] then
+    if rpm >= self.config["redline"] then
         self.lastCutOff = timer.curtime()
         torque = 0
     end
