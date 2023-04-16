@@ -17,11 +17,11 @@ Place each of these dependencies into your `garrysmod/garrysmod/addons` folder
 > Installation of this starfall script
 
 Folder location:
-- `garrysmod/garrysmod/data/starfall'`
+- `garrysmod/garrysmod/data/starfall`
 
 If you are downloading this project as a ZIP make sure you also unzip it into the correct folder location.
 The path should look like the following:
-`garrysmod/garrysmod/data/starfall/simulated_engine'`
+`garrysmod/garrysmod/data/starfall/simulated_engine`
 
 # How-To...
 
@@ -32,7 +32,9 @@ The path should look like the following:
 - Transfer Case model must be `models/sprops/cuboids/height06/size_1/cube_6x18x6.mdl`
 - Differential  model must be `models/sprops/cuboids/height06/size_1/cube_6x12x6.mdl`
 
-The console command for changing the Advanced Wire Entity Marker is `wire_adv_emarker_model MODEL_TO_CHANGE_TO`.
+The console command for changing the Advanced Wire Entity Marker is 
+
+`wire_adv_emarker_model MODEL_TO_CHANGE_TO`.
 
 ## Link the components
 >Link the advanced wire entity markers to each in this order
