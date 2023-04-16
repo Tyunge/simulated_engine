@@ -1,6 +1,8 @@
 # Simulated Engine
 
-This simulated engine [starfall](https://github.com/thegrb93/StarfallEx) script provides the building blocks for creating a realistic mobility system for garry's mod. The goal of this project is either to replace the existing mobility portion of [ACF](https://github.com/nrlulz/ACF), or to become it's own standalone mod.
+This simulated engine [starfall](https://github.com/thegrb93/StarfallEx) script provides the building blocks for creating a realistic mobility system for garry's mod. The goal of this project is either to replace the existing mobility portion of [ACF](https://github.com/nrlulz/ACF), or to become it's own standalone mod. 
+
+You can find videos of this script in use at my [YouTube Channel](https://www.youtube.com/@Tyunge).
 
 ## Dependencies 
 > Requirements for this script to work
@@ -54,3 +56,15 @@ The console command for changing the Advanced Wire Entity Marker is `wire_adv_em
 - `Mouse1` change gears up
 - `Mouse2` change gears down
 - `L.Shift` is clutch
+
+# To-Do:
+- [ ] Engine Stalling
+- [ ] Differential Lock Ratio
+- [ ] Transfer Case Power Bias
+- [ ] Transaxle 
+- [ ] Turbos
+- [ ] Supercharger
+- [ ] Engine Braking
+- [ ] Interpolated Sound Built-In
+- [ ] Fuel Tanks
+- [ ] Step by Step video guide
