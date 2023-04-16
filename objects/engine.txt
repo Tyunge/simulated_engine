@@ -81,7 +81,7 @@ function Engine:think()
         
         //Idle Controller
         if self.clutchInputRPM < self.config["idle"] then
-            self.idleThrottle = self.clutchInputRPM/self.config["idle"]
+            self.idleThrottle = (self.clutchInputRPM/self.config["idle"])*0.5
         else
             self.idleThrottle = 0
         end
@@ -107,7 +107,13 @@ function Engine:think()
 
         
     else
-    
+        local frictionCoefficient = (self.config["pkTorque"]*self.config["tqGraph"][2]*0.75)
+        local frictionFactor = (self.clutchInputRPM/self.config["redline"])*frictionCoefficient
+        local engineDeceleration = accelerationToRPM(ftlbToNM(frictionFactor)/self.inertia)
+        
+        self.outputTorque = 0
+        self.idleThrottle = 0
+        self.clutchInputRPM = math.approach(self.clutchInputRPM, 0, engineDeceleration)
     end
     
     self.rpm = self.clutchInputRPM

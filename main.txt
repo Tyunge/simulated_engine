@@ -10,9 +10,9 @@ if wire.ports.POD == nil or wire.ports.Engine == nil then return end
 
 local ENGINE = {
     idle        = 800,  -- rpm
-    redline     = 8000, -- rpm
-    pkTorque    = 1200,  -- ft-lb
-    fwMass      = 10,    -- kg
+    redline     = 9000, -- rpm
+    pkTorque    = 22,  -- ft-lb
+    fwMass      = 0.3,    -- kg
     
     powerCutOffTime = 0.05, -- seconds
     tqGraph         = {0,0.26,0.39,0.52,0.65,0.82,0.825,0.835,0.945,0.975,1,0.93,0.86,0.78,0.62,0.47} //0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8
@@ -35,7 +35,7 @@ local TRANSFERCASE = {
 }
 
 local DIFFERENTIAL = {
-    ratio = 3
+    ratio = 4
 }
 
 local COMPONENTS = {}
