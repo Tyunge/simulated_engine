@@ -38,6 +38,8 @@ The console command for changing the Advanced Wire Entity Marker is
 
 ## Link the components
 >Link the advanced wire entity markers to each in this order
+
+:warning: Differential orientation is important. Have the differential long ways between the wheels. :warning:
 ### RWD/FWD systems
 
 `Engine => Transmission => Differential => Wheels`
