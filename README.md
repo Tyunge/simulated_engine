@@ -21,12 +21,18 @@ Folder location:
 
 If you are downloading this project as a ZIP remember to rename the zip from `simulated_engine-main` to `simulated_engine`
 
-The path should look like the following:
-`garrysmod/garrysmod/data/starfall/simulated_engine/...`
+Steps for proper unzipping:
+1. Unzip folder into `garrysmod/garrysmod/data/starfall`
+2. Verify the Unzipped folder has this structure `simulated_engine-main/simulated_engine-main/...`
+3. Rename the **second** `simulated_engine-main` folder to `simulated_engine`
+4. Drag `simulated_engine` folder into the root `data/starfall` folder
+5. Delete the now empty `simulated_engine-main` folder
 
-The folder contents should appear as such:
+The folder contents should appear as such in the in-game starfall directory:
 
 ![Screenshot_108](https://user-images.githubusercontent.com/21030699/234411513-42b3a5ef-2c31-4faf-9757-b9d8a26311a4.png)
+
+
 
 
 
