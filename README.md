@@ -19,9 +19,16 @@ Place each of these dependencies into your `garrysmod/garrysmod/addons` folder
 Folder location:
 - `garrysmod/garrysmod/data/starfall`
 
-If you are downloading this project as a ZIP make sure you also unzip it into the correct folder location.
+If you are downloading this project as a ZIP remember to rename the zip from `simulated_engine-main` to `simulated_engine`
+
 The path should look like the following:
-`garrysmod/garrysmod/data/starfall/simulated_engine`
+`garrysmod/garrysmod/data/starfall/simulated_engine/...`
+
+The folder contents should appear as such:
+
+![Screenshot_108](https://user-images.githubusercontent.com/21030699/234411513-42b3a5ef-2c31-4faf-9757-b9d8a26311a4.png)
+
+
 
 # How-To...
 
